@@ -1,0 +1,15 @@
+{
+  "name": "Tagflow",
+  "short_name": "Tagflow",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff5e9",
+  "theme_color": "#ff7b47",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

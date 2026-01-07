@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+input, button {
+  font-family: inherit;
+}

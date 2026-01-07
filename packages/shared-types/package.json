@@ -1,0 +1,6 @@
+{
+  "name": "@tagflow/shared-types",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
