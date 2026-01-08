@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -26,9 +28,46 @@ const registerSchema = z.object({
 
 export const authRoutes = new Hono();
 
+const accessCookieName = "tf_access";
+const refreshCookieName = "tf_refresh";
+const cookieSecure = process.env.COOKIE_SECURE === "true";
+
+const setAuthCookies = (c: Context, token: string, refreshToken: string) => {
+  setCookie(c, accessCookieName, token, {
+    httpOnly: true,
+    secure: cookieSecure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60
+  });
+  setCookie(c, refreshCookieName, refreshToken, {
+    httpOnly: true,
+    secure: cookieSecure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7
+  });
+};
+
+const parseJsonBody = async (c: Context) => {
+  const raw = await c.req.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new Error("Invalid JSON");
+  }
+};
+
 authRoutes.post("/login", async (c) => {
   const tenantId = getTenantId(c);
-  const body = loginSchema.parse(await c.req.json());
+  let bodyInput: Record<string, unknown>;
+  try {
+    bodyInput = await parseJsonBody(c);
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+  const body = loginSchema.parse(bodyInput);
 
   const [user] = await db
     .select()
@@ -47,12 +86,20 @@ authRoutes.post("/login", async (c) => {
   const token = jwt.sign({ sub: user.id, role: user.role, companyId: user.companyId }, jwtSecret, { expiresIn: "1h" });
   const refreshToken = jwt.sign({ sub: user.id, role: user.role, companyId: user.companyId }, jwtSecret, { expiresIn: "7d" });
 
-  return c.json({ token, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  setAuthCookies(c, token, refreshToken);
+
+  return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
 authRoutes.post("/register", async (c) => {
   const tenantId = getTenantId(c);
-  const body = registerSchema.parse(await c.req.json());
+  let bodyInput: Record<string, unknown>;
+  try {
+    bodyInput = await parseJsonBody(c);
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+  const body = registerSchema.parse(bodyInput);
   const passwordHash = await bcrypt.hash(body.password, 10);
 
   const [created] = await db
@@ -75,7 +122,17 @@ authRoutes.post("/register", async (c) => {
 });
 
 authRoutes.post("/refresh", async (c) => {
-  const { refreshToken } = await c.req.json();
+  const contentLength = Number(c.req.header("content-length") || "0");
+  let bodyToken: string | undefined;
+  if (contentLength > 0) {
+    try {
+      const body = await parseJsonBody(c);
+      bodyToken = typeof body.refreshToken === "string" ? body.refreshToken : undefined;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+  }
+  const refreshToken = getCookie(c, refreshCookieName) ?? bodyToken;
   if (!refreshToken) {
     return c.json({ error: "Refresh token required" }, 400);
   }
@@ -83,8 +140,39 @@ authRoutes.post("/refresh", async (c) => {
   try {
     const payload = jwt.verify(refreshToken, jwtSecret) as { sub: string; role: string; companyId: string };
     const token = jwt.sign({ sub: payload.sub, role: payload.role, companyId: payload.companyId }, jwtSecret, { expiresIn: "1h" });
-    return c.json({ token });
+    setCookie(c, accessCookieName, token, {
+      httpOnly: true,
+      secure: cookieSecure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60
+    });
+    return c.json({ ok: true });
   } catch {
     return c.json({ error: "Invalid refresh token" }, 401);
+  }
+});
+
+authRoutes.post("/logout", async (c) => {
+  deleteCookie(c, accessCookieName, { path: "/" });
+  deleteCookie(c, refreshCookieName, { path: "/" });
+  return c.json({ ok: true });
+});
+
+authRoutes.get("/me", async (c) => {
+  const token = getCookie(c, accessCookieName);
+  if (!token) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const payload = jwt.verify(token, jwtSecret) as { sub: string; role: string; companyId: string };
+    const [user] = await db.select().from(users).where(and(eq(users.companyId, payload.companyId), eq(users.id, payload.sub)));
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch {
+    return c.json({ error: "Invalid token" }, 401);
   }
 });

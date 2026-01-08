@@ -1,52 +1,39 @@
-import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
+import { getApiBaseUrl } from "./config";
 
-const baseUrl = import.meta.env.VITE_API_URL ?? "";
+const baseUrl = getApiBaseUrl();
 
 const getHeaders = () => {
   const tenantId = useTenantStore.getState().tenantId;
-  const token = useAuthStore.getState().token;
 
   return {
     "Content-Type": "application/json",
-    "X-Tenant-Id": tenantId,
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    "X-Tenant-Id": tenantId
   };
 };
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const doFetch = async (tokenOverride?: string | null) => {
+  const doFetch = async () => {
     const headers = {
       ...getHeaders(),
       ...(options.headers || {})
     };
-    if (tokenOverride !== undefined) {
-      if (tokenOverride) {
-        headers.Authorization = `Bearer ${tokenOverride}`;
-      } else {
-        delete headers.Authorization;
-      }
-    }
     return fetch(`${baseUrl}${path}`, {
       ...options,
-      headers
+      headers,
+      credentials: "include"
     });
   };
 
   let res = await doFetch();
   if (res.status === 401) {
-    const refreshToken = useAuthStore.getState().refreshToken;
-    if (refreshToken) {
-      const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Tenant-Id": useTenantStore.getState().tenantId },
-        body: JSON.stringify({ refreshToken })
-      });
-      if (refreshRes.ok) {
-        const data = (await refreshRes.json()) as { token: string };
-        useAuthStore.getState().setAuth(data.token, refreshToken);
-        res = await doFetch(data.token);
-      }
+    const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Tenant-Id": useTenantStore.getState().tenantId },
+      credentials: "include"
+    });
+    if (refreshRes.ok) {
+      res = await doFetch();
     }
   }
 

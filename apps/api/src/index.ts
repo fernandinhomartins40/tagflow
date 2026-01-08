@@ -19,13 +19,25 @@ import { publicRoutes } from "./routes/public";
 import { reportsRoutes } from "./routes/reports";
 import { notificationsRoutes } from "./routes/notifications";
 import { usersRoutes } from "./routes/users";
+import { tabsRoutes } from "./routes/tabs";
+import { cashRoutes } from "./routes/cash";
 
 const app = new Hono();
 
 app.use("/*", secureHeaders());
-app.use("/*", cors({ origin: "*", allowHeaders: ["Content-Type", "Authorization", "X-Tenant-Id"] }));
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(
+  "/*",
+  cors({
+    origin: (origin) => corsOrigin ?? origin ?? "http://localhost:8080",
+    allowHeaders: ["Content-Type", "Authorization", "X-Tenant-Id"],
+    credentials: true
+  })
+);
 app.use("/*", rateLimit(120, 60_000));
 app.use("/api/*", tenantMiddleware);
+app.use("/auth/*", tenantMiddleware);
+app.use("/public/*", tenantMiddleware);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.get("/uploads/:tenant/:file", (c) => {
@@ -36,8 +48,10 @@ app.get("/uploads/:tenant/:file", (c) => {
 });
 
 app.route("/api/auth", authRoutes);
+app.route("/auth", authRoutes);
 
 const secure = new Hono();
+secure.use("/*", tenantMiddleware);
 secure.use("/*", authMiddleware);
 secure.route("/companies", companiesRoutes);
 secure.route("/branches", branchesRoutes);
@@ -50,9 +64,13 @@ secure.route("/transactions", transactionsRoutes);
 secure.route("/reports", reportsRoutes);
 secure.route("/notifications", notificationsRoutes);
 secure.route("/users", usersRoutes);
+secure.route("/tabs", tabsRoutes);
+secure.route("/cash", cashRoutes);
 
 app.route("/api", secure);
+app.route("/", secure);
 app.route("/api/public", publicRoutes);
+app.route("/public", publicRoutes);
 
 app.onError((err, c) => {
   logger.error(err);
@@ -60,12 +78,3 @@ app.onError((err, c) => {
 });
 
 export default app;
-
-if (import.meta.main) {
-  const port = Number(process.env.PORT ?? 3000);
-  console.log(`Tagflow API running on ${port}`);
-  Bun.serve({
-    port,
-    fetch: app.fetch
-  });
-}

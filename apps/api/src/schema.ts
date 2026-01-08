@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, boolean, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, boolean, numeric, date } from "drizzle-orm/pg-core";
 
 export const companies = pgTable("companies", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -42,9 +42,11 @@ export const customers = pgTable("customers", {
   branchId: uuid("branch_id"),
   name: text("name").notNull(),
   cpf: text("cpf"),
+  birthDate: date("birth_date"),
   phone: text("phone"),
   email: text("email"),
   credits: numeric("credits", { precision: 12, scale: 2 }).default("0").notNull(),
+  creditLimit: numeric("credit_limit", { precision: 12, scale: 2 }).default("0").notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -55,6 +57,8 @@ export const customerIdentifiers = pgTable("customer_identifiers", {
   customerId: uuid("customer_id").notNull(),
   type: text("type").notNull(),
   code: text("code").notNull(),
+  tabType: text("tab_type").notNull().default("prepaid"),
+  isMaster: boolean("is_master").default(true).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -79,6 +83,7 @@ export const services = pgTable("services", {
   description: text("description"),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
   unit: text("unit").notNull(),
+  imageUrl: text("image_url"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -89,8 +94,11 @@ export const locations = pgTable("locations", {
   branchId: uuid("branch_id"),
   name: text("name").notNull(),
   type: text("type").notNull(),
+  description: text("description"),
   capacity: integer("capacity"),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+  priceUnit: text("price_unit").notNull().default("hour"),
+  imageUrl: text("image_url"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -146,5 +154,69 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const tabs = pgTable("tabs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  branchId: uuid("branch_id"),
+  customerId: uuid("customer_id").notNull(),
+  identifierCode: text("identifier_code").notNull(),
+  type: text("type").notNull(), // credit | prepaid
+  status: text("status").notNull(), // open | closed
+  openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true })
+});
+
+export const tabItems = pgTable("tab_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  tabId: uuid("tab_id").notNull(),
+  productId: uuid("product_id"),
+  serviceId: uuid("service_id"),
+  locationId: uuid("location_id"),
+  description: text("description"),
+  quantity: integer("quantity").default(1).notNull(),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+  startAt: timestamp("start_at", { withTimezone: true }),
+  endAt: timestamp("end_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const tabItemParticipants = pgTable("tab_item_participants", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  tabItemId: uuid("tab_item_id").notNull(),
+  customerId: uuid("customer_id").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull()
+});
+
+export const cashRegisters = pgTable("cash_registers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  branchId: uuid("branch_id"),
+  openedBy: uuid("opened_by"),
+  closedBy: uuid("closed_by"),
+  status: text("status").notNull(), // open | closed
+  openingFloat: numeric("opening_float", { precision: 12, scale: 2 }).default("0").notNull(),
+  closingFloat: numeric("closing_float", { precision: 12, scale: 2 }),
+  totalCash: numeric("total_cash", { precision: 12, scale: 2 }).default("0").notNull(),
+  totalDebit: numeric("total_debit", { precision: 12, scale: 2 }).default("0").notNull(),
+  totalCredit: numeric("total_credit", { precision: 12, scale: 2 }).default("0").notNull(),
+  totalPix: numeric("total_pix", { precision: 12, scale: 2 }).default("0").notNull(),
+  notes: text("notes"),
+  openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true })
+});
+
+export const tabPayments = pgTable("tab_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  tabId: uuid("tab_id").notNull(),
+  cashRegisterId: uuid("cash_register_id"),
+  method: text("method").notNull(), // cash | debit | credit | pix
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });

@@ -1,0 +1,5 @@
+ALTER TABLE locations
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE locations
+ADD COLUMN IF NOT EXISTS image_url TEXT;

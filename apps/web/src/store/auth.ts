@@ -1,13 +1,22 @@
 import { create } from "zustand";
 
+type AuthStatus = "unknown" | "authenticated" | "unauthenticated";
+
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 interface AuthState {
-  token: string | null;
-  refreshToken: string | null;
-  setAuth: (token: string | null, refreshToken: string | null) => void;
+  status: AuthStatus;
+  user: AuthUser | null;
+  setAuth: (status: AuthStatus, user?: AuthUser | null) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  refreshToken: null,
-  setAuth: (token, refreshToken) => set({ token, refreshToken })
+  status: "unknown",
+  user: null,
+  setAuth: (status, user = null) => set({ status, user })
 }));

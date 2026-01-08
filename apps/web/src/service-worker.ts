@@ -1,11 +1,14 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
+import { clientsClaim } from "workbox-core";
 import { precacheAndRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
-import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
+import { NetworkFirst, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
 precacheAndRoute(self.__WB_MANIFEST);
+self.skipWaiting();
+clientsClaim();
 
 registerRoute(
   ({ url }) => url.pathname.startsWith("/api"),
@@ -25,7 +28,7 @@ registerRoute(
 
 registerRoute(
   ({ request }) => request.destination === "document",
-  new StaleWhileRevalidate({ cacheName: "page-cache" })
+  new NetworkFirst({ cacheName: "page-cache", networkTimeoutSeconds: 3 })
 );
 
 self.addEventListener("push", (event) => {

@@ -10,15 +10,18 @@ const customerSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
   name: z.string().min(2),
   cpf: z.string().optional().nullable(),
+  birthDate: z.coerce.date().optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   credits: z.coerce.number().optional().nullable(),
+  creditLimit: z.coerce.number().optional().nullable(),
   active: z.boolean().optional().nullable()
 });
 
 const identifierSchema = z.object({
-  type: z.enum(["nfc", "barcode", "manual"]),
-  code: z.string().min(3)
+  type: z.enum(["nfc", "barcode", "manual", "qr"]),
+  code: z.string().min(3),
+  tabType: z.enum(["credit", "prepaid"]).optional()
 });
 
 const creditSchema = z.object({
@@ -79,15 +82,38 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
   const id = c.req.param("id");
   const body = identifierSchema.parse(await c.req.json());
 
+  const [existing] = await db
+    .select()
+    .from(customerIdentifiers)
+    .where(and(eq(customerIdentifiers.companyId, tenantId), eq(customerIdentifiers.code, body.code)));
+
+  if (existing) {
+    const [updated] = await db
+      .update(customerIdentifiers)
+      .set({
+        customerId: id,
+        type: body.type,
+        active: true,
+        isMaster: true,
+        tabType: body.tabType ?? existing.tabType ?? "prepaid"
+      })
+      .where(and(eq(customerIdentifiers.id, existing.id), eq(customerIdentifiers.companyId, tenantId)))
+      .returning();
+    return c.json(updated, 200);
+  }
+
   const [created] = await db
     .insert(customerIdentifiers)
-    .values({ companyId: tenantId, customerId: id, type: body.type, code: body.code })
-    .onConflictDoNothing()
+    .values({
+      companyId: tenantId,
+      customerId: id,
+      type: body.type,
+      code: body.code,
+      isMaster: true,
+      active: true,
+      tabType: body.tabType ?? "prepaid"
+    })
     .returning();
-
-  if (!created) {
-    return c.json({ error: "Identificador ja usado" }, 409);
-  }
 
   return c.json(created, 201);
 });
@@ -123,5 +149,5 @@ customersRoutes.get("/by-identifier/:identifier", async (c) => {
     .innerJoin(customers, eq(customers.id, customerIdentifiers.customerId))
     .where(and(eq(customerIdentifiers.companyId, tenantId), eq(customerIdentifiers.code, identifier), eq(customerIdentifiers.active, true)));
 
-  return c.json({ identifier, data: row?.customer ?? null });
+  return c.json({ identifier, data: row?.customer ?? null, identifierData: row?.identifier ?? null });
 });

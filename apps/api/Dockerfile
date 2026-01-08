@@ -10,6 +10,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=base /app/dist ./dist
 COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/src ./src
 RUN bun install --production
 EXPOSE 3000
 CMD ["bun", "dist/index.js"]

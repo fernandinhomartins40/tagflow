@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, CupSoda, MapPinned, CreditCard, Link2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
 import { ScannerModal } from "../../components/ScannerModal";
@@ -9,30 +13,121 @@ interface Customer {
   id: string;
   name: string;
   credits: string;
+  creditLimit?: string | null;
 }
 
-export function AdminPdv() {
-  const [identifier, setIdentifier] = useState("");
-  const [amount, setAmount] = useState("");
-  const [items, setItems] = useState<Array<{ productId?: string; serviceId?: string; quantity: string; unitPrice: string }>>([]);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [splitParticipants, setSplitParticipants] = useState<Array<{ customerId: string; amount: string }>>([]);
-  const nfc = useNfcReader();
+interface Product {
+  id: string;
+  name: string;
+  price: string;
+  imageUrl?: string | null;
+}
 
-  const lookupQuery = useQuery({
-    queryKey: ["customer-by-identifier", identifier],
-    queryFn: () => apiFetch<{ data: Customer | null }>(`/api/customers/by-identifier/${identifier}`),
-    enabled: Boolean(identifier)
-  });
+interface Service {
+  id: string;
+  name: string;
+  price: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  price: string;
+  priceUnit: "hour" | "day" | "month" | "period";
+}
+
+interface BookingConflict {
+  id: string;
+  customerId?: string | null;
+  customerName?: string | null;
+}
+
+interface IdentifierData {
+  tabType?: "credit" | "prepaid";
+}
+
+interface Tab {
+  id: string;
+  customerId: string;
+  identifierCode: string;
+  type: "credit" | "prepaid";
+  status: "open" | "closed";
+}
+
+type CartItemType = "product" | "service" | "location" | "credit";
+
+interface CartItem {
+  key: string;
+  type: CartItemType;
+  id?: string;
+  name: string;
+  price: number;
+  quantity: number;
+  imageUrl?: string;
+  startAt?: string;
+  endAt?: string;
+  participants?: Array<{ customerId: string; amount: number }>;
+  conflict?: BookingConflict | null;
+}
+
+const priceUnits = {
+  hour: "Hora",
+  day: "Dia",
+  month: "Mes",
+  period: "Periodo"
+} as const;
+
+const quickActions = [
+  { key: "products", label: "Produtos", icon: Boxes, color: "bg-amber-50 text-amber-700 border-amber-200" },
+  { key: "services", label: "Servicos", icon: CupSoda, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { key: "locations", label: "Locais", icon: MapPinned, color: "bg-sky-50 text-sky-700 border-sky-200" },
+  { key: "credit", label: "Credito pre-pago", icon: CreditCard, color: "bg-violet-50 text-violet-700 border-violet-200" },
+  { key: "link", label: "Vincular", icon: Link2, color: "bg-slate-50 text-slate-700 border-slate-200" }
+] as const;
+
+export function AdminPdv() {
+  const navigate = useNavigate();
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [activeModal, setActiveModal] = useState<"products" | "services" | "locations" | "credit" | null>(null);
+  const [identifyOpen, setIdentifyOpen] = useState(false);
+  const [identifyMethod, setIdentifyMethod] = useState<"nfc" | "qr" | "barcode" | "number" | "search">("nfc");
+  const [identifier, setIdentifier] = useState("");
+  const [numberInput, setNumberInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchCustomerId, setSearchCustomerId] = useState<string | null>(null);
+  const [searchIdentifier, setSearchIdentifier] = useState("");
+  const [tabType, setTabType] = useState<"credit" | "prepaid">("prepaid");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanType, setScanType] = useState<"qr" | "barcode">("qr");
+  const [error, setError] = useState<string | null>(null);
+
+  const [locationStart, setLocationStart] = useState("");
+  const [locationEnd, setLocationEnd] = useState("");
+  const [locationTotal, setLocationTotal] = useState("");
+  const [creditAmount, setCreditAmount] = useState("");
+  const [locationConflict, setLocationConflict] = useState<BookingConflict | null>(null);
+  const [confirmReserved, setConfirmReserved] = useState(false);
+
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [participantIdentifier, setParticipantIdentifier] = useState("");
+  const [participantAmount, setParticipantAmount] = useState("");
+  const [participantTargetKey, setParticipantTargetKey] = useState<string | null>(null);
+
+  const nfc = useNfcReader();
 
   const productsQuery = useQuery({
     queryKey: ["products"],
-    queryFn: () => apiFetch<{ data: Array<{ id: string; name: string; price: string }> }>("/api/products")
+    queryFn: () => apiFetch<{ data: Product[] }>("/api/products")
   });
 
   const servicesQuery = useQuery({
     queryKey: ["services"],
-    queryFn: () => apiFetch<{ data: Array<{ id: string; name: string; price: string }> }>("/api/services")
+    queryFn: () => apiFetch<{ data: Service[] }>("/api/services")
+  });
+
+  const locationsQuery = useQuery({
+    queryKey: ["locations"],
+    queryFn: () => apiFetch<{ data: Location[] }>("/api/locations")
   });
 
   const customersQuery = useQuery({
@@ -40,240 +135,737 @@ export function AdminPdv() {
     queryFn: () => apiFetch<{ data: Array<{ id: string; name: string }> }>("/api/customers")
   });
 
-  const consumeMutation = useMutation({
-    mutationFn: async () => {
-      const customer = lookupQuery.data?.data;
-      if (!customer) {
-        throw new Error("Cliente nao encontrado");
-      }
-      return apiFetch("/api/transactions/consume", {
+  const filteredCustomers = useMemo(() => {
+    if (!participantSearch) return [];
+    return customersQuery.data?.data?.filter((c) => c.name.toLowerCase().includes(participantSearch.toLowerCase())) ?? [];
+  }, [participantSearch, customersQuery.data?.data]);
+
+  const openTabMutation = useMutation({
+    mutationFn: async (payload: { identifier: string; type: "credit" | "prepaid" }) => {
+      return apiFetch<Tab>("/api/tabs/open", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
+  });
+
+  const addTabItemMutation = useMutation({
+    mutationFn: async (payload: {
+      tabId: string;
+      productId?: string;
+      serviceId?: string;
+      locationId?: string;
+      description?: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+      startAt?: string;
+      endAt?: string;
+    }) => {
+      return apiFetch("/api/tabs/items", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
+  });
+
+  const addTabItemParticipants = useMutation({
+    mutationFn: async (payload: { tabItemId: string; participants: Array<{ customerId: string; amount: number }> }) => {
+      return apiFetch("/api/tabs/items/participants", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
+  });
+
+  const addCreditsMutation = useMutation({
+    mutationFn: async (payload: { customerId: string; amount: number }) => {
+      return apiFetch(`/api/customers/${payload.customerId}/add-credits`, {
+        method: "POST",
+        body: JSON.stringify({ amount: payload.amount })
+      });
+    }
+  });
+
+  const createBookingMutation = useMutation({
+    mutationFn: async (payload: {
+      locationId: string;
+      startAt: string;
+      endAt: string;
+      total: number;
+      participants: Array<{ customerId: string; share: number }>;
+    }) => {
+      return apiFetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
-          customerId: customer.id,
-          amount: Number(amount),
-          items: items
-            .filter((item) => item.quantity && item.unitPrice && (item.productId || item.serviceId))
-            .map((item) => ({
-              productId: item.productId || undefined,
-              serviceId: item.serviceId || undefined,
-              quantity: Number(item.quantity),
-              unitPrice: Number(item.unitPrice)
-            }))
+          locationId: payload.locationId,
+          startAt: payload.startAt,
+          endAt: payload.endAt,
+          total: payload.total,
+          status: "in_progress",
+          participants: payload.participants
         })
       });
     }
   });
 
-  const splitMutation = useMutation({
-    mutationFn: async () => {
-      return apiFetch("/api/transactions/split", {
-        method: "POST",
-        body: JSON.stringify({
-          participants: splitParticipants
-            .filter((participant) => participant.customerId && participant.amount)
-            .map((participant) => ({ customerId: participant.customerId, amount: Number(participant.amount) }))
-        })
-      });
+  useEffect(() => {
+    if (identifyOpen) {
+      nfc.start();
     }
-  });
+  }, [identifyOpen]);
+
+  useEffect(() => {
+    if (!identifyOpen || !nfc.data) return;
+    setIdentifier(nfc.data);
+  }, [identifyOpen, nfc.data]);
+
+  useEffect(() => {
+    if (!identifyOpen) return;
+    if (!identifier.trim()) return;
+    apiFetch<{ identifierData?: IdentifierData | null }>(`/api/customers/by-identifier/${identifier}`)
+      .then((res) => {
+        if (res.identifierData?.tabType) {
+          setTabType(res.identifierData.tabType);
+        }
+      })
+      .catch(() => null);
+  }, [identifyOpen, identifier]);
+
+  useEffect(() => {
+    setLocationConflict(null);
+    setConfirmReserved(false);
+  }, [locationStart, locationEnd]);
+
+  const addItem = (item: CartItem) => {
+    setCartItems((prev) => {
+      const existing = prev.find((p) => p.key === item.key);
+      if (existing) {
+        return prev.map((p) => (p.key === item.key ? { ...p, quantity: p.quantity + 1 } : p));
+      }
+      return [...prev, item];
+    });
+  };
+
+  const removeItem = (key: string) => {
+    setCartItems((prev) => {
+      const existing = prev.find((p) => p.key === key);
+      if (!existing) return prev;
+      if (existing.quantity <= 1) {
+        return prev.filter((p) => p.key !== key);
+      }
+      return prev.map((p) => (p.key === key ? { ...p, quantity: p.quantity - 1 } : p));
+    });
+  };
+
+  const openIdentifyModal = () => {
+    if (cartItems.length === 0) return;
+    setIdentifyMethod("nfc");
+    setIdentifyOpen(true);
+    setError(null);
+  };
+
+  const resolveIdentifier = () => {
+    if (identifyMethod === "number") {
+      return numberInput.trim();
+    }
+    if (identifyMethod === "search") {
+      return searchIdentifier.trim();
+    }
+    return identifier.trim();
+  };
+
+  const handleConfirmIdentify = async () => {
+    setError(null);
+    const resolved = resolveIdentifier();
+    if (!resolved) {
+      setError("Informe um identificador valido.");
+      return;
+    }
+
+    let customerId: string | null = null;
+    if (identifyMethod === "search") {
+      if (!searchCustomerId) {
+        setError("Selecione um cliente.");
+        return;
+      }
+      customerId = searchCustomerId;
+      try {
+        await apiFetch(`/api/customers/${searchCustomerId}/activate-tag`, {
+          method: "POST",
+          body: JSON.stringify({ type: "manual", code: resolved })
+        });
+      } catch {
+        // ignore conflict
+      }
+    }
+
+    const tab = await openTabMutation.mutateAsync({ identifier: resolved, type: tabType });
+
+    const itemsSnapshot = [...cartItems];
+    for (const item of itemsSnapshot) {
+      if (item.type === "credit") {
+        const customer = await apiFetch<{ data: Customer | null }>(`/api/customers/by-identifier/${resolved}`);
+        if (!customer.data) {
+          throw new Error("Cliente nao encontrado para inserir credito");
+        }
+        await addCreditsMutation.mutateAsync({ customerId: customer.data.id, amount: item.price });
+        continue;
+      }
+
+      if (item.type === "location") {
+        if (!item.startAt || !item.endAt) {
+          throw new Error("Informe horario da locacao");
+        }
+        const participants = item.participants ?? [];
+        await createBookingMutation.mutateAsync({
+          locationId: item.id ?? "",
+          startAt: item.startAt,
+          endAt: item.endAt,
+          total: item.price,
+          participants: participants.map((p) => ({ customerId: p.customerId, share: p.amount }))
+        });
+      }
+
+      const created = await addTabItemMutation.mutateAsync({
+        tabId: tab.id,
+        productId: item.type === "product" ? item.id : undefined,
+        serviceId: item.type === "service" ? item.id : undefined,
+        locationId: item.type === "location" ? item.id : undefined,
+        description: item.type === "location" ? "Locacao" : undefined,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        total: item.price * item.quantity,
+        startAt: item.startAt,
+        endAt: item.endAt
+      });
+
+      if (item.type === "location" && item.participants?.length) {
+        await addTabItemParticipants.mutateAsync({
+          tabItemId: (created as { id: string }).id,
+          participants: item.participants
+        });
+      }
+    }
+
+    setCartItems([]);
+    setIdentifyOpen(false);
+    setIdentifier("");
+    setNumberInput("");
+    setSearchIdentifier("");
+    setSearchCustomerId(null);
+  };
+
+  const calcLocationTotal = (location: Location | undefined) => {
+    if (!location || !locationStart || !locationEnd) return;
+    const start = new Date(locationStart);
+    const end = new Date(locationEnd);
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs <= 0) return;
+    const price = Number(location.price);
+    let total = price;
+    switch (location.priceUnit) {
+      case "hour":
+        total = price * (diffMs / 3_600_000);
+        break;
+      case "day":
+        total = price * (diffMs / 86_400_000);
+        break;
+      case "month":
+        total = price * (diffMs / 2_592_000_000);
+        break;
+      case "period":
+      default:
+        total = price;
+    }
+    setLocationTotal(total.toFixed(2));
+  };
+
+  const checkLocationConflict = async (locationId: string) => {
+    if (!locationStart || !locationEnd) return null;
+    const res = await apiFetch<{ data: BookingConflict | null }>(
+      `/api/bookings/for-slot?locationId=${locationId}&startAt=${new Date(locationStart).toISOString()}&endAt=${new Date(locationEnd).toISOString()}`
+    );
+    setLocationConflict(res.data ?? null);
+    return res.data;
+  };
+
+  const addLocationToCart = async (location: Location) => {
+    if (!locationStart || !locationEnd) {
+      setError("Informe horario da locacao.");
+      return;
+    }
+    const conflict = await checkLocationConflict(location.id);
+    if (conflict && !confirmReserved) {
+      setError("Local reservado. Confirme o atendimento para continuar.");
+      return;
+    }
+    if (!locationTotal) {
+      calcLocationTotal(location);
+    }
+    addItem({
+      key: `location-${location.id}-${locationStart}-${locationEnd}`,
+      type: "location",
+      id: location.id,
+      name: location.name,
+      price: Number(locationTotal || location.price),
+      quantity: 1,
+      startAt: new Date(locationStart).toISOString(),
+      endAt: new Date(locationEnd).toISOString(),
+      conflict: conflict ?? null
+    });
+    setConfirmReserved(false);
+    setLocationConflict(null);
+    setError(null);
+  };
+
+  const openParticipantModal = (key: string) => {
+    setParticipantTargetKey(key);
+    setParticipantSearch("");
+    setParticipantIdentifier("");
+    setParticipantAmount("");
+  };
+
+  const updateParticipants = (next: Array<{ customerId: string; amount: number }>) => {
+    setCartItems((prev) => prev.map((item) => (item.key === participantTargetKey ? { ...item, participants: next } : item)));
+  };
 
   return (
     <section className="space-y-4">
       <header>
         <h2 className="text-2xl font-semibold">PDV</h2>
-        <p className="text-sm text-slate-600">Identifique o cliente e registre consumo.</p>
+        <p className="text-sm text-slate-600">Selecione itens e vincule a comanda rapidamente.</p>
       </header>
-      <div className="rounded-2xl border border-brand-100 bg-white p-4">
-        <label className="text-xs uppercase tracking-[0.2em] text-brand-400">Identificador</label>
-        <input
-          value={identifier}
-          onChange={(event) => setIdentifier(event.target.value)}
-          placeholder="NFC, codigo de barras ou numero"
-          className="mt-2 w-full rounded-xl border border-brand-100 px-3 py-2"
-        />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={() => lookupQuery.refetch()}>Buscar cliente</Button>
-          <Button variant="outline" onClick={() => nfc.start()}>
-            Ler NFC
-          </Button>
-          <Button variant="outline" onClick={() => setScannerOpen(true)}>
-            Scan camera
-          </Button>
-        </div>
-        {nfc.data ? (
-          <div className="mt-3 rounded-xl bg-brand-50 p-3">
-            <p className="text-sm text-slate-600">NFC lido: {nfc.data}</p>
-            <Button className="mt-2" size="sm" onClick={() => setIdentifier(nfc.data ?? "")}>
-              Usar identificador
-            </Button>
-          </div>
-        ) : null}
-        {lookupQuery.data?.data ? (
-          <div className="mt-4 rounded-xl bg-brand-50 p-3">
-            <p className="text-sm text-slate-600">Cliente: {lookupQuery.data.data.name}</p>
-            <p className="text-sm text-slate-600">Saldo: R$ {lookupQuery.data.data.credits}</p>
-          </div>
-        ) : null}
+
+      <div className="grid grid-cols-2 gap-3">
+        {quickActions.map((action) => (
+          <button
+            key={action.key}
+            type="button"
+            onClick={() => {
+              if (action.key === "link") {
+                navigate("/admin/identifiers");
+                return;
+              }
+              setActiveModal(action.key);
+              setError(null);
+            }}
+            className={`aspect-square w-full rounded-2xl border ${action.color} p-3 text-left text-sm font-semibold shadow-sm transition hover:brightness-95`}
+          >
+            <action.icon className="h-6 w-6" />
+            <span className="mt-auto">{action.label}</span>
+          </button>
+        ))}
       </div>
-      <div className="rounded-2xl border border-brand-100 bg-white p-4">
-        <h3 className="text-lg font-semibold">Itens</h3>
-        <p className="text-sm text-slate-600">Adicione produtos e servicos rapidamente.</p>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Itens da comanda</h3>
+          <span className="text-xs text-slate-400">{cartItems.length} item(s)</span>
+        </div>
         <div className="mt-3 space-y-2">
-          {items.map((item, index) => (
-            <div key={`${index}-item`} className="grid gap-2 md:grid-cols-4">
-              <select
-                value={item.productId || ""}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  const selected = productsQuery.data?.data?.find((product) => product.id === value);
-                  const copy = [...items];
-                  copy[index] = {
-                    ...copy[index],
-                    productId: value || undefined,
-                    serviceId: undefined,
-                    unitPrice: selected?.price ?? item.unitPrice
-                  };
-                  setItems(copy);
-                }}
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              >
-                <option value="">Produto</option>
-                {productsQuery.data?.data?.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={item.serviceId || ""}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  const selected = servicesQuery.data?.data?.find((service) => service.id === value);
-                  const copy = [...items];
-                  copy[index] = {
-                    ...copy[index],
-                    serviceId: value || undefined,
-                    productId: undefined,
-                    unitPrice: selected?.price ?? item.unitPrice
-                  };
-                  setItems(copy);
-                }}
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              >
-                <option value="">Servico</option>
-                {servicesQuery.data?.data?.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={item.quantity}
-                onChange={(event) => {
-                  const copy = [...items];
-                  copy[index] = { ...copy[index], quantity: event.target.value };
-                  setItems(copy);
-                }}
-                placeholder="Qtd"
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              />
-              <input
-                value={item.unitPrice}
-                onChange={(event) => {
-                  const copy = [...items];
-                  copy[index] = { ...copy[index], unitPrice: event.target.value };
-                  setItems(copy);
-                }}
-                placeholder="Preco unit"
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              />
-            </div>
-          ))}
-          <Button size="sm" variant="outline" onClick={() => setItems([...items, { quantity: "1", unitPrice: "" }])}>
-            Adicionar item
+          {cartItems.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhum item selecionado.</p>
+          ) : (
+            cartItems.map((item) => (
+              <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{item.name}</p>
+                  <p className="text-xs text-slate-500">R$ {item.price.toFixed(2)} {item.type === "location" && item.startAt ? "- locacao" : ""}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.type === "location" ? (
+                    <Button size="sm" variant="outline" onClick={() => openParticipantModal(item.key)}>
+                      Dividir
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
+                    -
+                  </Button>
+                  <span className="text-sm">{item.quantity}</span>
+                  <Button size="sm" variant="outline" onClick={() => addItem(item)}>
+                    +
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setCartItems([])}>
+            Cancelar
+          </Button>
+          <Button onClick={openIdentifyModal}>
+            Adicionar
           </Button>
         </div>
-        <input
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          placeholder="Valor total"
-          className="mt-2 w-full rounded-xl border border-brand-100 px-3 py-2"
-        />
-        <Button
-          className="mt-3"
-          variant="outline"
-          onClick={() => {
-            const total = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
-            setAmount(total.toFixed(2));
+      </div>
+
+      {activeModal ? (
+        <Modal
+          title={activeModal === "products" ? "Produtos" : activeModal === "services" ? "Servicos" : activeModal === "locations" ? "Locais" : "Credito pre-pago"}
+          onClose={() => {
+            setActiveModal(null);
+            setError(null);
           }}
         >
-          Calcular total
-        </Button>
-        <Button className="mt-3" onClick={() => consumeMutation.mutate()}>
-          {consumeMutation.isPending ? "Registrando..." : "Registrar consumo"}
-        </Button>
-      </div>
-      <div className="rounded-2xl border border-brand-100 bg-white p-4">
-        <h3 className="text-lg font-semibold">Divisao de conta</h3>
-        <p className="text-sm text-slate-600">Distribua valores entre varios clientes.</p>
-        <div className="mt-3 space-y-2">
-          {splitParticipants.map((participant, index) => (
-            <div key={`${participant.customerId}-${index}`} className="grid gap-2 md:grid-cols-3">
-              <select
-                value={participant.customerId}
-                onChange={(event) => {
-                  const copy = [...splitParticipants];
-                  copy[index] = { ...copy[index], customerId: event.target.value };
-                  setSplitParticipants(copy);
-                }}
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              >
-                <option value="">Cliente</option>
-                {lookupQuery.data?.data ? (
-                  <option value={lookupQuery.data.data.id}>{lookupQuery.data.data.name}</option>
-                ) : null}
-                {customersQuery.data?.data?.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={participant.amount}
-                onChange={(event) => {
-                  const copy = [...splitParticipants];
-                  copy[index] = { ...copy[index], amount: event.target.value };
-                  setSplitParticipants(copy);
-                }}
-                placeholder="Valor"
-                className="w-full rounded-xl border border-brand-100 px-3 py-2"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSplitParticipants(splitParticipants.filter((_, i) => i !== index))}
-              >
-                Remover
-              </Button>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            Itens adicionados neste modal:{" "}
+            {cartItems.filter((item) => {
+              if (activeModal === "products") return item.type === "product";
+              if (activeModal === "services") return item.type === "service";
+              if (activeModal === "locations") return item.type === "location";
+              return item.type === "credit";
+            }).length}
+          </div>
+          {activeModal === "products" ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {productsQuery.data?.data?.map((product) => (
+                <ItemCard
+                  key={product.id}
+                  title={product.name}
+                  imageUrl={product.imageUrl ?? undefined}
+                  price={Number(product.price)}
+                  onAdd={() => addItem({ key: `product-${product.id}`, type: "product", id: product.id, name: product.name, price: Number(product.price), quantity: 1, imageUrl: product.imageUrl ?? undefined })}
+                  onRemove={() => removeItem(`product-${product.id}`)}
+                />
+              ))}
+              <div className="mt-4 space-y-2 sm:col-span-2">
+                {cartItems
+                  .filter((item) => item.type === "product")
+                  .map((item) => (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-slate-500">Qtd: {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
+                          -
+                        </Button>
+                        <Button size="sm" onClick={() => addItem(item)}>
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
-          ))}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSplitParticipants([...splitParticipants, { customerId: "", amount: "" }])}
-          >
-            Adicionar participante
-          </Button>
-        </div>
-        <Button className="mt-3" onClick={() => splitMutation.mutate()}>
-          {splitMutation.isPending ? "Dividindo..." : "Registrar divisao"}
-        </Button>
-      </div>
+          ) : null}
+          {activeModal === "services" ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {servicesQuery.data?.data?.map((service) => (
+                <ItemCard
+                  key={service.id}
+                  title={service.name}
+                  price={Number(service.price)}
+                  onAdd={() => addItem({ key: `service-${service.id}`, type: "service", id: service.id, name: service.name, price: Number(service.price), quantity: 1 })}
+                  onRemove={() => removeItem(`service-${service.id}`)}
+                />
+              ))}
+              <div className="mt-4 space-y-2 sm:col-span-2">
+                {cartItems
+                  .filter((item) => item.type === "service")
+                  .map((item) => (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-slate-500">Qtd: {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
+                          -
+                        </Button>
+                        <Button size="sm" onClick={() => addItem(item)}>
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+          {activeModal === "locations" ? (
+            <div className="space-y-4">
+              <div className="grid gap-2 md:grid-cols-3">
+                <input type="datetime-local" value={locationStart} onChange={(event) => setLocationStart(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <input type="datetime-local" value={locationEnd} onChange={(event) => setLocationEnd(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+                <input value={locationTotal} onChange={(event) => setLocationTotal(event.target.value)} placeholder="Total" className="w-full rounded-xl border border-slate-200 px-3 py-2" />
+              </div>
+              {locationConflict ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Local reservado. Cliente: {locationConflict.customerName ?? "Nao informado"}.
+                </div>
+              ) : null}
+              {locationConflict ? (
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={confirmReserved} onChange={(event) => setConfirmReserved(event.target.checked)} />
+                  Confirmar atendimento da reserva
+                </label>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {locationsQuery.data?.data?.map((location) => (
+                  <ItemCard
+                    key={location.id}
+                    title={`${location.name} - R$ ${location.price}/${priceUnits[location.priceUnit]}`}
+                    price={Number(location.price)}
+                    onAdd={() => addLocationToCart(location)}
+                    onRemove={() => removeItem(`location-${location.id}-${locationStart}-${locationEnd}`)}
+                  />
+                ))}
+              </div>
+              {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+              <div className="mt-4 space-y-2">
+                {cartItems
+                  .filter((item) => item.type === "location")
+                  .map((item) => (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {item.startAt ? new Date(item.startAt).toLocaleString("pt-BR") : ""} -{" "}
+                          {item.endAt ? new Date(item.endAt).toLocaleString("pt-BR") : ""}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
+                        Remover
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+          {activeModal === "credit" ? (
+            <div className="space-y-3">
+              <input
+                placeholder="Valor de credito pre-pago"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                value={creditAmount}
+                onChange={(event) => setCreditAmount(event.target.value)}
+              />
+              <Button onClick={() => {
+                if (!creditAmount) return;
+                addItem({ key: `credit-${Date.now()}`, type: "credit", name: "Credito", price: Number(creditAmount), quantity: 1 });
+                setCreditAmount("");
+              }}>
+                Adicionar credito pre-pago
+              </Button>
+              {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+              <div className="mt-4 space-y-2">
+                {cartItems
+                  .filter((item) => item.type === "credit")
+                  .map((item) => (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">Credito</p>
+                        <p className="text-xs text-slate-500">R$ {item.price.toFixed(2)}</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
+                        Remover
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </Modal>
+      ) : null}
+
+      {identifyOpen ? (
+        <Modal title="Identificar cliente" onClose={() => setIdentifyOpen(false)}>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">Prioridade: NFC. O leitor foi ativado automaticamente.</p>
+            <p className="text-xs text-slate-500">Credito pre-pago = saldo antecipado. Credito = consumo com acerto no final.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant={identifyMethod === "nfc" ? "default" : "outline"} onClick={() => setIdentifyMethod("nfc")}>NFC</Button>
+              <Button variant={identifyMethod === "qr" ? "default" : "outline"} onClick={() => { setIdentifyMethod("qr"); setScanType("qr"); setScanOpen(true); }}>QR Code</Button>
+              <Button variant={identifyMethod === "barcode" ? "default" : "outline"} onClick={() => { setIdentifyMethod("barcode"); setScanType("barcode"); setScanOpen(true); }}>Codigo de barras</Button>
+              <Button variant={identifyMethod === "number" ? "default" : "outline"} onClick={() => setIdentifyMethod("number")}>Numeracao</Button>
+              <Button variant={identifyMethod === "search" ? "default" : "outline"} onClick={() => setIdentifyMethod("search")}>Busca de cliente</Button>
+            </div>
+
+            {identifyMethod === "number" ? (
+              <input
+                value={numberInput}
+                onChange={(event) => setNumberInput(event.target.value)}
+                placeholder="Digite a numeracao"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              />
+            ) : null}
+
+            {identifyMethod === "search" ? (
+              <div className="space-y-2">
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Buscar cliente por nome"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {(customersQuery.data?.data ?? [])
+                    .filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .slice(0, 6)
+                    .map((c) => (
+                      <Button key={c.id} size="sm" variant={searchCustomerId === c.id ? "default" : "outline"} onClick={() => setSearchCustomerId(c.id)}>
+                        {c.name}
+                      </Button>
+                    ))}
+                </div>
+                <input
+                  value={searchIdentifier}
+                  onChange={(event) => setSearchIdentifier(event.target.value)}
+                  placeholder="Identificador para vincular"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+              </div>
+            ) : null}
+
+            {nfc.data && identifyMethod === "nfc" ? (
+              <div className="rounded-xl bg-slate-100 p-3 text-sm text-slate-600">NFC lido: {nfc.data}</div>
+            ) : null}
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select
+                value={tabType}
+                onChange={(event) => setTabType(event.target.value as "credit" | "prepaid")}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              >
+                <option value="prepaid">Comanda pre-paga (saldo antecipado)</option>
+                <option value="credit">Comanda credito (acerto no final)</option>
+              </select>
+              <Button onClick={handleConfirmIdentify}>Confirmar</Button>
+            </div>
+            {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+          </div>
+        </Modal>
+      ) : null}
+
+      {participantTargetKey ? (
+        <Modal title="Dividir locacao" onClose={() => setParticipantTargetKey(null)}>
+          <div className="space-y-3">
+            <input
+              value={participantSearch}
+              onChange={(event) => setParticipantSearch(event.target.value)}
+              placeholder="Buscar participante por nome"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <div className="flex flex-wrap gap-2">
+              {filteredCustomers.slice(0, 6).map((customer) => (
+                <Button
+                  key={customer.id}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const target = cartItems.find((c) => c.key === participantTargetKey);
+                    const list = target?.participants ?? [];
+                    if (list.some((p) => p.customerId === customer.id)) return;
+                    updateParticipants([...list, { customerId: customer.id, amount: 0 }]);
+                  }}
+                >
+                  {customer.name}
+                </Button>
+              ))}
+            </div>
+            <input
+              value={participantIdentifier}
+              onChange={(event) => setParticipantIdentifier(event.target.value)}
+              placeholder="Adicionar por identificador"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <input
+              value={participantAmount}
+              onChange={(event) => setParticipantAmount(event.target.value)}
+              placeholder="Valor"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!participantIdentifier) return;
+                const res = await apiFetch<{ data: Customer | null }>(`/api/customers/by-identifier/${participantIdentifier}`);
+                if (!res.data) return;
+                const target = cartItems.find((c) => c.key === participantTargetKey);
+                const list = target?.participants ?? [];
+                if (list.some((p) => p.customerId === res.data!.id)) return;
+                updateParticipants([...list, { customerId: res.data.id, amount: Number(participantAmount) || 0 }]);
+                setParticipantIdentifier("");
+                setParticipantAmount("");
+              }}
+            >
+              Adicionar participante
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
+
       <ScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScan={(value) => setIdentifier(value)}
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onScan={(value) => {
+          if (scanType === "qr" || scanType === "barcode") {
+            setIdentifier(value);
+          }
+          setScanOpen(false);
+        }}
       />
     </section>
+  );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      data-modal-root="true"
+      className="fixed inset-0 z-[200] overflow-y-auto bg-black/50"
+      style={{
+        paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+        paddingLeft: "max(1rem, env(safe-area-inset-left))",
+        paddingRight: "max(1rem, env(safe-area-inset-right))"
+      }}
+    >
+      <div
+        data-modal-panel="true"
+        className="mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-lg sm:p-6"
+        style={{ maxHeight: "calc(100vh - 3rem)" }}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <button className="text-sm text-slate-500" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-2">{children}</div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ItemCard({ title, imageUrl, price, onAdd, onRemove }: { title: string; imageUrl?: string; price: number; onAdd: () => void; onRemove: () => void }) {
+  return (
+    <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="space-y-2">
+        <div className="h-16 w-full rounded-xl bg-slate-100">
+          {imageUrl ? <img src={imageUrl} alt={title} className="h-full w-full rounded-xl object-cover" /> : null}
+        </div>
+        <div>
+          <p className="text-xs font-semibold">{title}</p>
+          <p className="text-[11px] text-slate-500">R$ {price.toFixed(2)}</p>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center gap-1">
+        <Button size="sm" variant="outline" onClick={onRemove}>
+          -
+        </Button>
+        <Button size="sm" onClick={onAdd}>
+          +
+        </Button>
+      </div>
+    </div>
   );
 }

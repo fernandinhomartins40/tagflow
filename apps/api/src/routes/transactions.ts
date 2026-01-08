@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
 import { consumptionItems, customers, products, transactions } from "../schema";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, gte, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
 
@@ -39,16 +39,37 @@ export const transactionsRoutes = new Hono();
 transactionsRoutes.get("/", async (c) => {
   const tenantId = getTenantId(c);
   const { page, pageSize } = paginationSchema.parse(c.req.query());
+  const type = c.req.query("type");
+  const startAt = c.req.query("startAt");
+  const endAt = c.req.query("endAt");
   const offset = (page - 1) * pageSize;
+
+  const filters = [
+    eq(transactions.companyId, tenantId),
+    type ? eq(transactions.type, type) : undefined,
+    startAt ? gte(transactions.createdAt, new Date(startAt)) : undefined,
+    endAt ? lte(transactions.createdAt, new Date(endAt)) : undefined
+  ].filter(Boolean);
+
+  const whereClause = filters.length ? and(...filters) : eq(transactions.companyId, tenantId);
 
   const data = await db
     .select()
     .from(transactions)
-    .where(eq(transactions.companyId, tenantId))
+    .where(whereClause)
+    .orderBy(sql`${transactions.createdAt} desc`)
     .limit(pageSize)
     .offset(offset);
 
-  return c.json({ data, meta: { page, pageSize } });
+  const [summary] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`.mapWith(Number),
+      count: sql<number>`count(*)`.mapWith(Number)
+    })
+    .from(transactions)
+    .where(whereClause);
+
+  return c.json({ data, meta: { page, pageSize, total: summary?.total ?? 0, count: summary?.count ?? 0 } });
 });
 
 transactionsRoutes.post("/consume", async (c) => {

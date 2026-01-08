@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { bookings, bookingParticipants } from "../schema";
-import { and, eq, gte, lte, or, sql } from "drizzle-orm";
+import { bookingParticipants, bookings, customers, transactions } from "../schema";
+import { and, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
 
@@ -19,6 +19,12 @@ const bookingSchema = z.object({
 
 const splitSchema = z.object({
   participants: z.array(z.object({ customerId: z.string().uuid(), share: z.coerce.number().positive() }))
+});
+
+const chargeSchema = z.object({
+  description: z.string().optional().nullable(),
+  participants: z.array(z.object({ customerId: z.string().uuid(), amount: z.coerce.number().positive() })).optional(),
+  status: z.enum(["pending", "in_progress", "completed"]).optional()
 });
 
 export const bookingsRoutes = new Hono();
@@ -48,6 +54,40 @@ bookingsRoutes.get("/", async (c) => {
     .offset(offset);
 
   return c.json({ data, meta: { page, pageSize } });
+});
+
+bookingsRoutes.get("/for-slot", async (c) => {
+  const tenantId = getTenantId(c);
+  const locationId = c.req.query("locationId");
+  const startAt = c.req.query("startAt");
+  const endAt = c.req.query("endAt");
+
+  if (!locationId || !startAt || !endAt) {
+    return c.json({ error: "locationId, startAt, endAt required" }, 400);
+  }
+
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+
+  const [row] = await db
+    .select({ booking: bookings, customerName: customers.name })
+    .from(bookings)
+    .leftJoin(customers, eq(customers.id, bookings.customerId))
+    .where(
+      and(
+        eq(bookings.companyId, tenantId),
+        eq(bookings.locationId, locationId),
+        or(eq(bookings.status, "pending"), eq(bookings.status, "in_progress")),
+        lte(bookings.startAt, end),
+        gte(bookings.endAt, start)
+      )
+    );
+
+  if (!row?.booking) {
+    return c.json({ data: null });
+  }
+
+  return c.json({ data: { ...row.booking, customerName: row.customerName } });
 });
 
 bookingsRoutes.post("/", async (c) => {
@@ -177,4 +217,96 @@ bookingsRoutes.post("/:id/split-payment", async (c) => {
   );
 
   return c.json({ id, participants: body.participants });
+});
+
+bookingsRoutes.post("/:id/charge", async (c) => {
+  const tenantId = getTenantId(c);
+  const id = c.req.param("id");
+  const body = chargeSchema.parse(await c.req.json());
+
+  const [booking] = await db
+    .select()
+    .from(bookings)
+    .where(and(eq(bookings.id, id), eq(bookings.companyId, tenantId)));
+
+  if (!booking) {
+    return c.json({ error: "Reserva nao encontrada" }, 404);
+  }
+
+  let participants = body.participants;
+  if (!participants?.length) {
+    if (booking.customerId) {
+      participants = [{ customerId: booking.customerId, amount: Number(booking.total) }];
+    } else {
+      const rows = await db
+        .select()
+        .from(bookingParticipants)
+        .where(and(eq(bookingParticipants.bookingId, id), eq(bookingParticipants.companyId, tenantId)));
+      if (!rows.length) {
+        return c.json({ error: "Sem participantes para cobrar" }, 400);
+      }
+      const total = Number(booking.total);
+      const sum = rows.reduce((acc, row) => acc + Number(row.share), 0);
+      const factor = sum ? total / sum : 0;
+      participants = rows.map((row) => ({
+        customerId: row.customerId,
+        amount: factor ? Number(row.share) * factor : 0
+      }));
+    }
+  }
+
+  const customerIds = participants.map((p) => p.customerId);
+  const customersData = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.companyId, tenantId), inArray(customers.id, customerIds)));
+  const customersMap = new Map(customersData.map((customer) => [customer.id, customer]));
+
+  for (const participant of participants) {
+    const customer = customersMap.get(participant.customerId);
+    if (!customer) {
+      return c.json({ error: `Cliente ${participant.customerId} nao encontrado` }, 404);
+    }
+    if (Number(customer.credits) < participant.amount) {
+      return c.json({ error: `Saldo insuficiente para ${participant.customerId}` }, 400);
+    }
+  }
+
+  const description = body.description ?? `Locacao ${booking.id}`;
+
+  const data = await db.transaction(async (tx) => {
+    const created = await Promise.all(
+      participants!.map(async (participant) => {
+        await tx
+          .update(customers)
+          .set({ credits: sql`${customers.credits} - ${participant.amount}` })
+          .where(and(eq(customers.id, participant.customerId), eq(customers.companyId, tenantId)));
+
+        const [txRow] = await tx
+          .insert(transactions)
+          .values({
+            companyId: tenantId,
+            branchId: booking.branchId ?? undefined,
+            customerId: participant.customerId,
+            type: "debit",
+            amount: participant.amount.toString(),
+            description
+          })
+          .returning();
+
+        return txRow;
+      })
+    );
+
+    if (body.status || booking.status === "pending") {
+      await tx
+        .update(bookings)
+        .set({ status: body.status ?? "in_progress" })
+        .where(and(eq(bookings.id, id), eq(bookings.companyId, tenantId)));
+    }
+
+    return created;
+  });
+
+  return c.json({ id, data });
 });

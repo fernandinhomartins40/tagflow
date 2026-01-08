@@ -1,11 +1,15 @@
 import { Context, Next } from "hono";
+import { getCookie } from "hono/cookie";
 import jwt from "jsonwebtoken";
 
 const jwtSecret = process.env.JWT_SECRET ?? "";
+const accessCookieName = "tf_access";
 
 export const authMiddleware = async (c: Context, next: Next) => {
   const auth = c.req.header("authorization") ?? "";
-  const token = auth.replace("Bearer ", "");
+  const headerToken = auth.replace("Bearer ", "");
+  const cookieToken = getCookie(c, accessCookieName);
+  const token = cookieToken || headerToken;
   if (!token) {
     return c.json({ error: "Unauthorized" }, 401);
   }
