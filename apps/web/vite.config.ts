@@ -12,7 +12,7 @@ export default defineConfig({
         name: "Tagflow",
         short_name: "Tagflow",
         description: "Gestao multi-tenant para estabelecimentos comerciais",
-        start_url: "/",
+        start_url: "/login",
         scope: "/",
         display: "standalone",
         background_color: "#fff5e9",

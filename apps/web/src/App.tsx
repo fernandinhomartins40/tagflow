@@ -29,6 +29,10 @@ export default function App() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const tenantId = useTenantStore((state) => state.tenantId);
   const apiBaseUrl = getApiBaseUrl();
+  const isStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone);
 
   useEffect(() => {
     if (status !== "unknown") return;
@@ -56,7 +60,7 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<MarketingLanding />} />
+      <Route path="/" element={isStandalone ? <Navigate to="/login" replace /> : <MarketingLanding />} />
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
       <Route element={<AppShell />}>
         <Route
