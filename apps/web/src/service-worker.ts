@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 import { clientsClaim } from "workbox-core";
-import { precacheAndRoute } from "workbox-precaching";
-import { registerRoute } from "workbox-routing";
+import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
@@ -10,13 +10,23 @@ precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
 clientsClaim();
 
-registerRoute(
-  ({ url }) => url.pathname.startsWith("/api"),
-  new NetworkFirst({
-    cacheName: "api-cache",
-    networkTimeoutSeconds: 3
-  })
-);
+const apiStrategy = new NetworkFirst({
+  cacheName: "api-cache",
+  networkTimeoutSeconds: 3
+});
+
+registerRoute(({ url }) => url.pathname.startsWith("/api"), async (args) => {
+  try {
+    const response = await apiStrategy.handle(args);
+    if (response) return response;
+  } catch {
+    // ignore
+  }
+  return new Response(JSON.stringify({ error: "offline" }), {
+    status: 503,
+    headers: { "Content-Type": "application/json" }
+  });
+});
 
 registerRoute(
   ({ request }) => request.destination === "script" || request.destination === "style" || request.destination === "image",
@@ -26,9 +36,19 @@ registerRoute(
   })
 );
 
+const pageStrategy = new NetworkFirst({ cacheName: "page-cache", networkTimeoutSeconds: 3 });
+const navigationHandler = createHandlerBoundToURL("/index.html");
+
 registerRoute(
-  ({ request }) => request.destination === "document",
-  new NetworkFirst({ cacheName: "page-cache", networkTimeoutSeconds: 3 })
+  new NavigationRoute(async (args) => {
+    try {
+      const response = await pageStrategy.handle(args);
+      if (response) return response;
+    } catch {
+      // ignore
+    }
+    return navigationHandler(args);
+  })
 );
 
 self.addEventListener("push", (event) => {
