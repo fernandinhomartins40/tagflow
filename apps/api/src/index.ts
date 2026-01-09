@@ -21,6 +21,8 @@ import { notificationsRoutes } from "./routes/notifications";
 import { usersRoutes } from "./routes/users";
 import { tabsRoutes } from "./routes/tabs";
 import { cashRoutes } from "./routes/cash";
+import { superAdminRoutes } from "./routes/superadmin";
+import { stripeRoutes } from "./routes/stripe";
 
 const app = new Hono();
 
@@ -49,6 +51,12 @@ app.get("/uploads/:tenant/:file", (c) => {
 
 app.route("/api/auth", authRoutes);
 app.route("/auth", authRoutes);
+app.route("/api/stripe", stripeRoutes);
+
+const superAdmin = new Hono();
+superAdmin.use("/*", authMiddleware);
+superAdmin.route("/", superAdminRoutes);
+app.route("/api/superadmin", superAdmin);
 
 const secure = new Hono();
 secure.use("/*", tenantMiddleware);

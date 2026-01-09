@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { branches, companies, customerIdentifiers, customers, locations, products, services, users } from "./schema";
+import { branches, companies, customerIdentifiers, customers, locations, plans, products, services, users } from "./schema";
 
 const demoCompanyId = "11111111-1111-1111-1111-111111111111";
 const mainBranchId = "22222222-2222-2222-2222-222222222222";
@@ -13,10 +13,20 @@ const run = async () => {
       id: demoCompanyId,
       name: "Demo Tagflow",
       cnpj: "00.000.000/0001-00",
-      plan: "demo",
+      plan: "Demo",
       status: "active",
       theme: "sunset"
     })
+    .onConflictDoNothing();
+
+  await db
+    .insert(plans)
+    .values([
+      { name: "Free", description: "Entrada com limite basico.", priceMonthly: "0.00", currency: "brl", active: true },
+      { name: "Start", description: "Operacao inicial completa.", priceMonthly: "199.00", currency: "brl", active: true },
+      { name: "Growth", description: "Escala e recursos avancados.", priceMonthly: "399.00", currency: "brl", active: true },
+      { name: "Enterprise", description: "Plano sob medida.", priceMonthly: "0.00", currency: "brl", active: true }
+    ])
     .onConflictDoNothing();
 
   await db
@@ -45,13 +55,22 @@ const run = async () => {
 
   await db
     .insert(users)
-    .values({
-      companyId: demoCompanyId,
-      name: "Admin Demo",
-      email: "admin@tagflow.local",
-      passwordHash,
-      role: "super_admin"
-    })
+    .values([
+      {
+        companyId: demoCompanyId,
+        name: "Admin Demo",
+        email: "admin@tagflow.local",
+        passwordHash,
+        role: "super_admin"
+      },
+      {
+        companyId: demoCompanyId,
+        name: "Super Admin",
+        email: "superadmin@tagflow.local",
+        passwordHash,
+        role: "super_admin"
+      }
+    ])
     .onConflictDoNothing();
 
   await db

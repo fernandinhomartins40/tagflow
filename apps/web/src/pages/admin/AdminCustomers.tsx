@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
+import { Nfc, Barcode, QrCode, Hash } from "lucide-react";
 import { apiFetch } from "../../services/api";
+import { formatCurrencyInput, formatCurrencyValue, parseCurrencyInput } from "../../utils/currency";
+import { ScannerModal } from "../../components/ScannerModal";
+import { AddCreditModal, type PaymentMethod } from "../../components/AddCreditModal";
 
 interface Customer {
   id: string;
@@ -35,7 +40,7 @@ export function AdminCustomers() {
           cpf: cpf ? onlyDigits(cpf) : null,
           birthDate: birthDate ? toIsoDate(birthDate) : null,
           phone: phone ? onlyDigits(phone) : null,
-          creditLimit: Number(creditLimit) || 0
+          creditLimit: parseCurrencyInput(creditLimit)
         })
       });
     },
@@ -50,10 +55,10 @@ export function AdminCustomers() {
   });
 
   const addCreditsMutation = useMutation({
-    mutationFn: async ({ id, amount }: { id: string; amount: number }) => {
+    mutationFn: async ({ id, amount, method }: { id: string; amount: number; method: PaymentMethod }) => {
       return apiFetch(`/api/customers/${id}/add-credits`, {
         method: "POST",
-        body: JSON.stringify({ amount })
+        body: JSON.stringify({ amount, paymentMethod: method })
       });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] })
@@ -107,7 +112,7 @@ export function AdminCustomers() {
           />
           <input
             value={creditLimit}
-            onChange={(event) => setCreditLimit(event.target.value)}
+            onChange={(event) => setCreditLimit(formatCurrencyInput(event.target.value))}
             placeholder="Limite de credito (pos-pago)"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
@@ -129,7 +134,7 @@ export function AdminCustomers() {
             <div className="mt-3 flex flex-wrap gap-2">
               <CreditAdder
                 customerId={customer.id}
-                onAdd={(amount) => addCreditsMutation.mutate({ id: customer.id, amount })}
+                onAdd={(amount, method) => addCreditsMutation.mutate({ id: customer.id, amount, method })}
               />
             </div>
             <IdentifierLinker
@@ -144,21 +149,55 @@ export function AdminCustomers() {
 }
 
 function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: (type: string, code: string) => void }) {
-  const [type, setType] = useState("nfc");
+  const [type, setType] = useState<"nfc" | "barcode" | "qr" | "manual">("nfc");
   const [code, setCode] = useState("");
+  const [nfcDialogOpen, setNfcDialogOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
+
+  const options = [
+    { value: "nfc", label: "NFC", icon: Nfc },
+    { value: "barcode", label: "Codigo", icon: Barcode },
+    { value: "qr", label: "QR Code", icon: QrCode },
+    { value: "manual", label: "Numeracao", icon: Hash }
+  ] as const;
 
   return (
-    <div className="mt-3 grid gap-2 md:grid-cols-3">
-      <select
-        value={type}
-        onChange={(event) => setType(event.target.value)}
-        className="w-full rounded-xl border border-brand-100 px-3 py-2"
-      >
-        <option value="nfc">NFC</option>
-        <option value="barcode">Codigo de barras</option>
-        <option value="qr">QR Code</option>
-        <option value="manual">Numeracao</option>
-      </select>
+    <div className="mt-3 space-y-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {options.map((option) => {
+          const active = type === option.value;
+          const isNfc = option.value === "nfc";
+          const Icon = option.icon;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                setType(option.value);
+                if (option.value === "nfc") {
+                  setNfcDialogOpen(true);
+                }
+                if (option.value === "barcode") {
+                  setScannerMode("barcode");
+                  setScannerOpen(true);
+                }
+                if (option.value === "qr") {
+                  setScannerMode("qr");
+                  setScannerOpen(true);
+                }
+              }}
+              className={`flex aspect-square flex-col items-center justify-center rounded-2xl border px-2 text-xs font-semibold transition ${
+                active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-brand-100 bg-white text-slate-600"
+              } ${isNfc ? "relative animate-pulse border-emerald-300 bg-emerald-50 text-emerald-700" : ""}`}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="mt-1">{option.label}</span>
+              {isNfc ? <span className="absolute -top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" /> : null}
+            </button>
+          );
+        })}
+      </div>
       <input
         value={code}
         onChange={(event) => setCode(event.target.value)}
@@ -168,7 +207,36 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
       <Button size="sm" onClick={() => onLink(type, code)}>
         Vincular
       </Button>
+      {nfcDialogOpen ? <NfcDialog onClose={() => setNfcDialogOpen(false)} /> : null}
+      {scannerOpen ? (
+        <ScannerModal
+          open={scannerOpen}
+          mode={scannerMode}
+          onClose={() => setScannerOpen(false)}
+          onScan={(value) => setCode(value)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function NfcDialog({ onClose }: { onClose: () => void }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-5 text-center shadow-lg">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+          <span className="absolute inline-flex h-16 w-16 animate-ping rounded-full bg-emerald-200 opacity-70" />
+          <Nfc className="relative h-8 w-8" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold text-slate-900">Aguardando NFC</h3>
+        <p className="mt-2 text-sm text-slate-600">Encoste a pulseira/cartao para ler o identificador automaticamente.</p>
+        <Button className="mt-4 w-full" variant="outline" onClick={onClose}>
+          Fechar
+        </Button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -215,19 +283,18 @@ function formatDate(value: string) {
   return `${day}/${month}/${year}`;
 }
 
-function CreditAdder({ customerId, onAdd }: { customerId: string; onAdd: (amount: number) => void }) {
-  const [amount, setAmount] = useState("50");
+function CreditAdder({ customerId, onAdd }: { customerId: string; onAdd: (amount: number, method: PaymentMethod) => void }) {
+  const [modalOpen, setModalOpen] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <input
-        value={amount}
-        onChange={(event) => setAmount(event.target.value)}
-        placeholder={`Credito para ${customerId.slice(0, 6)}...`}
-        className="w-32 rounded-xl border border-brand-100 px-3 py-2 text-sm"
-      />
-      <Button size="sm" variant="outline" onClick={() => onAdd(Number(amount))}>
+      <Button size="sm" variant="outline" onClick={() => setModalOpen(true)}>
         Adicionar credito pre-pago
       </Button>
+      <AddCreditModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onConfirm={(amount, method) => onAdd(amount, method)}
+      />
     </div>
   );
 }

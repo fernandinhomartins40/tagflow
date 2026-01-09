@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
+import { formatCurrencyInput, parseCurrencyInput } from "../../utils/currency";
 
 interface Tab {
   id: string;
@@ -198,7 +199,7 @@ export function AdminTabs() {
     return productName || serviceName || locationName || item.description || "Item";
   };
 
-  const paymentSum = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const paymentSum = payments.reduce((sum, payment) => sum + parseCurrencyInput(payment.amount), 0);
   const paymentRemaining = closeTotal - paymentSum;
   const paymentDiff = Math.abs(paymentRemaining);
 
@@ -353,7 +354,7 @@ export function AdminTabs() {
                   <input
                     value={payment.amount}
                     onChange={(event) => {
-                      const value = event.target.value;
+                      const value = formatCurrencyInput(event.target.value);
                       setPayments((prev) => prev.map((p, i) => (i === index ? { ...p, amount: value } : p)));
                     }}
                     placeholder="Valor"
@@ -402,7 +403,7 @@ export function AdminTabs() {
                   const parsed = payments
                     .map((payment) => ({
                       method: payment.method,
-                      amount: Number(payment.amount.replace(",", "."))
+                      amount: parseCurrencyInput(payment.amount)
                     }))
                     .filter((payment) => payment.amount > 0);
                   if (!parsed.length) {

@@ -20,6 +20,14 @@ export function AdminLogin() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [email, setEmail] = useState("admin@tagflow.local");
   const [password, setPassword] = useState("admin123");
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const isIos =
+    typeof window !== "undefined" &&
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent) &&
+    !(window as { navigator: { standalone?: boolean } }).navigator.standalone;
+
+  const isAndroid =
+    typeof window !== "undefined" && /android/i.test(window.navigator.userAgent);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -39,6 +47,17 @@ export function AdminLogin() {
       navigate("/admin/pdv", { replace: true });
     }
   }, [status, navigate]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler as EventListener);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler as EventListener);
+    };
+  }, []);
 
   if (status === "authenticated") {
     return <Navigate to="/admin/pdv" replace />;
@@ -79,6 +98,37 @@ export function AdminLogin() {
             {loginMutation.isPending ? "Entrando..." : "Entrar"}
           </Button>
           {loginMutation.isError ? <p className="text-sm text-rose-300">Falha no login</p> : null}
+          <div className="grid gap-3">
+            {isAndroid ? (
+              <div className="rounded-2xl border border-orange-300/30 bg-orange-500/10 p-3 text-xs text-orange-100/80">
+                <p className="text-sm font-semibold text-orange-100">Instale o app no Android</p>
+                <p className="mt-1 text-xs text-orange-100/70">
+                  {installPrompt ? "Toque para instalar o Tagflow na tela inicial." : "No menu do navegador, toque em Adicionar a tela inicial."}
+                </p>
+                {installPrompt ? (
+                  <Button
+                    className="mt-3 w-full bg-orange-500 text-slate-950 hover:bg-orange-400"
+                    onClick={async () => {
+                      const prompt = installPrompt;
+                      setInstallPrompt(null);
+                      await prompt.prompt();
+                      await prompt.userChoice;
+                    }}
+                  >
+                    Instalar app
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {isIos ? (
+              <div className="rounded-2xl border border-emerald-300/30 bg-emerald-500/10 p-3 text-xs text-emerald-100/80">
+                <p className="text-sm font-semibold text-emerald-100">Instale no iPhone/iPad</p>
+                <p className="mt-1 text-xs text-emerald-100/70">
+                  Toque no botao de compartilhar e selecione Adicionar a Tela de Inicio.
+                </p>
+              </div>
+            ) : null}
+          </div>
           <p className="text-center text-xs text-orange-100/60">
             Precisa de ajuda? <a className="text-orange-200 hover:text-orange-100" href="mailto:contato@tagflow.app">Fale com a equipe</a>
           </p>
@@ -86,4 +136,9 @@ export function AdminLogin() {
       </div>
     </section>
   );
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }

@@ -1,5 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="128" fill="#ff7b47"/>
-  <path d="M140 168h232v48H188v56h168v48H188v112h-48V168z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
+  <!-- Generator: Adobe Illustrator 29.8.4, SVG Export Plug-In . SVG Version: 2.1.1 Build 6)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #f50;
+      }
+
+      .st1 {
+        fill: url(#linear-gradient1);
+      }
+
+      .st1, .st2 {
+        mix-blend-mode: multiply;
+      }
+
+      .st3 {
+        isolation: isolate;
+      }
+
+      .st4 {
+        fill: url(#Gradiente_sem_nome_16);
+      }
+
+      .st5 {
+        fill: #ff4200;
+      }
+
+      .st2 {
+        fill: url(#linear-gradient);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="-298.79" y1="200.38" x2="-7.61" y2="200.38" gradientTransform="translate(515.06 184.84) rotate(45.32)" gradientUnits="userSpaceOnUse">
+      <stop offset=".02" stop-color="#b4afb3"/>
+      <stop offset=".17" stop-color="#ccc9cb"/>
+      <stop offset=".35" stop-color="#e2e0e2"/>
+      <stop offset=".54" stop-color="#f2f1f2"/>
+      <stop offset=".74" stop-color="#fcfbfb"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+    <linearGradient id="Gradiente_sem_nome_16" data-name="Gradiente sem nome 16" x1="25.54" y1="347.79" x2="-268.99" y2="120.92" gradientTransform="translate(515.06 184.84) rotate(45.32)" gradientUnits="userSpaceOnUse">
+      <stop offset=".19" stop-color="#b4afb3"/>
+      <stop offset=".31" stop-color="#ccc9cb"/>
+      <stop offset=".46" stop-color="#e2e0e2"/>
+      <stop offset=".62" stop-color="#f2f1f2"/>
+      <stop offset=".79" stop-color="#fcfbfb"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient1" x1="327.4" y1="301.93" x2="276.73" y2="260.89" gradientTransform="matrix(1,0,0,1,0,0)" xlink:href="#linear-gradient"/>
+  </defs>
+  <g class="st3">
+    <g id="Camada_1">
+      <rect class="st0" y="0" width="512" height="512" rx="128" ry="128"/>
+      <g>
+        <path class="st5" d="M68.39,206.82s136.12-94.32,374.34-40.5c0,0,17.7,9.63,11.73,25.4l-72.24,113.37-123.37-3.79-143.22-2.66-59.81-60.48s-3.59-21.14,12.58-31.35Z"/>
+        <path class="st2" d="M68.81,206.82s136.12-94.32,374.34-40.5c0,0,17.7,9.63,11.73,25.4l-72.24,113.37-123.37-3.79-143.22-2.66-59.81-60.48s-3.59-21.14,12.58-31.35Z"/>
+        <path class="st4" d="M65.9,208.46s-17.08,23.47,38.3,26.26c5.75.29,11.25,1.64,17.15,1.43,19.61-.68,39.31-6.43,54.46-18.81,0,0,64.72-91.69,168.2-16.15,0,0,10.42,9.7,34.41,6.53,0,0,93.48-10.23,64.3-41.39l12.09,6.68s8.52,4.73,6.52,16.57l-.48,87.08s2.39,16.82-22.79,34.05c0,0-46.41,20.14-58,22.28,0,0-14.37,7.09-27.68,22.44,0,0-62.25,93.35-162.68,14.53,0,0-18.39-13.61-28.33-10.91,0,0-70.53-3.15-87.51-23.64,0,0-7.4-8.03-9.8-21l-13.6-82.48s-2.41-12.41,15.43-23.48Z"/>
+        <path class="st5" d="M359.4,261.39l-83.22-.85-14.2,54.82h35.22l.28.28c-1.7,2.46-3.79,4.54-6.25,6.25-22.29,18.37-55.9,11.65-69.44-13.92-3.31-6.25-4.6-11.95-4.41-19.15,0-8.71,2.41-16.89,7.24-24.28,7.4-11.32,19.54-18.74,33.01-19.95,13.21-1.19,26.77,4.34,36.71,12.85l39.48-39.19c-85.77-71.2-151.12,9.86-151.12,9.86-25.52,32.59-28.27,78.8-5.46,113.32,51.83,78.47,177.27,54.85,185.7-48.08.9-11.06-.52-21.73-3.55-31.95Z"/>
+        <polygon class="st1" points="276.67 260.96 262.47 315.77 297.69 315.77 297.97 316.06 359.89 261.81 276.67 260.96"/>
+      </g>
+    </g>
+  </g>
 </svg>

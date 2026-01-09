@@ -4,6 +4,8 @@ import { Nfc } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
 import { useNfcReader } from "../../hooks/useNfcReader";
+import { ScannerModal } from "../../components/ScannerModal";
+import { formatCurrencyInput, parseCurrencyInput } from "../../utils/currency";
 
 interface Customer {
   id: string;
@@ -22,6 +24,8 @@ export function AdminIdentifiers() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [identifierType, setIdentifierType] = useState<IdentifierType>("nfc");
   const [identifierCode, setIdentifierCode] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
   const [tabType, setTabType] = useState<TabType>("prepaid");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -52,7 +56,7 @@ export function AdminIdentifiers() {
           cpf: cpf ? onlyDigits(cpf) : null,
           birthDate: birthDate ? toIsoDate(birthDate) : null,
           phone: phone ? onlyDigits(phone) : null,
-          creditLimit: Number(creditLimit) || 0
+          creditLimit: parseCurrencyInput(creditLimit)
         })
       });
     }
@@ -194,7 +198,7 @@ export function AdminIdentifiers() {
                 />
                 <input
                   value={creditLimit}
-                  onChange={(event) => setCreditLimit(event.target.value)}
+                  onChange={(event) => setCreditLimit(formatCurrencyInput(event.target.value))}
                   placeholder="Limite de credito (pos-pago)"
                   className="w-full rounded-xl border border-brand-100 px-3 py-2"
                 />
@@ -223,10 +227,10 @@ export function AdminIdentifiers() {
               <Button size="sm" variant={identifierType === "nfc" ? "default" : "outline"} onClick={() => setIdentifierType("nfc")}>
                 NFC
               </Button>
-              <Button size="sm" variant={identifierType === "barcode" ? "default" : "outline"} onClick={() => setIdentifierType("barcode")}>
+              <Button size="sm" variant={identifierType === "barcode" ? "default" : "outline"} onClick={() => { setIdentifierType("barcode"); setScannerMode("barcode"); setScannerOpen(true); }}>
                 Codigo de barras
               </Button>
-              <Button size="sm" variant={identifierType === "qr" ? "default" : "outline"} onClick={() => setIdentifierType("qr")}>
+              <Button size="sm" variant={identifierType === "qr" ? "default" : "outline"} onClick={() => { setIdentifierType("qr"); setScannerMode("qr"); setScannerOpen(true); }}>
                 QR Code
               </Button>
               <Button size="sm" variant={identifierType === "manual" ? "default" : "outline"} onClick={() => setIdentifierType("manual")}>
@@ -262,6 +266,13 @@ export function AdminIdentifiers() {
           </div>
         </div>
       </div>
+
+      <ScannerModal
+        open={scannerOpen}
+        mode={scannerMode}
+        onClose={() => setScannerOpen(false)}
+        onScan={(value) => setIdentifierCode(value)}
+      />
     </section>
   );
 }

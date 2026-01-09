@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
@@ -102,7 +102,6 @@ export function AppShell() {
   const isAuthenticated = status === "authenticated";
 
   const activePath = location.pathname;
-  const flatAdminItems = useMemo(() => adminSections.flatMap((section) => section.items), []);
 
   const apiBaseUrl = getApiBaseUrl();
 

@@ -1,7 +1,9 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil } from "lucide-react";
+import Cropper from "react-easy-crop";
+import type { Area } from "react-easy-crop";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
 import { getApiBaseUrl } from "../../services/config";
@@ -15,7 +17,6 @@ interface Product {
   imageUrl?: string | null;
 }
 
-const VIEW_SIZE = 320;
 const OUTPUT_SIZE = 512;
 
 const formatCurrency = (value: string) => {
@@ -126,14 +127,16 @@ export function AdminProducts() {
       if (!editName.trim()) throw new Error("Informe o nome do produto");
       if (numericPrice <= 0) throw new Error("Informe um preco valido");
 
-      const updated = await apiFetch<Product>(`/api/products/${editProduct.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || null,
-          price: numericPrice
-        })
-      });
+      const updated = await apiFetch<Product>(`/api/products/${editProduct.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            name: editName.trim(),
+            description: editDescription.trim() || null,
+            price: numericPrice
+          })
+        }
+      );
 
       if (editImageFile) {
         const form = new FormData();
@@ -218,12 +221,15 @@ export function AdminProducts() {
             className="min-h-[80px] w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <div className="space-y-2">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => handleSelectImage(event.target.files?.[0] ?? null, "create")}
-              className="w-full rounded-xl border border-brand-100 px-3 py-2"
-            />
+            <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100">
+              Escolher imagem
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => handleSelectImage(event.target.files?.[0] ?? null, "create")}
+                className="hidden"
+              />
+            </label>
             {imagePreview ? (
               <img src={imagePreview} alt="Preview" className="h-20 w-20 rounded-xl object-cover" />
             ) : null}
@@ -332,12 +338,15 @@ export function AdminProducts() {
               className="min-h-[80px] w-full rounded-xl border border-slate-200 px-3 py-2"
             />
             <div className="space-y-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => handleSelectImage(event.target.files?.[0] ?? null, "edit")}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2"
-              />
+              <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100">
+                Trocar imagem
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handleSelectImage(event.target.files?.[0] ?? null, "edit")}
+                  className="hidden"
+                />
+              </label>
               {editImagePreview ? (
                 <img src={editImagePreview} alt={editName} className="h-24 w-24 rounded-xl object-cover" />
               ) : null}
@@ -410,101 +419,32 @@ function ImageCropper({
   onClose: () => void;
   onConfirm: (file: File) => void;
 }) {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [cropSize, setCropSize] = useState(260);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const [baseScale, setBaseScale] = useState(1);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const dragRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const [croppedArea, setCroppedArea] = useState<Area | null>(null);
 
-  const scale = baseScale * zoom;
-  const display = useMemo(() => ({
-    width: imageSize.width * scale,
-    height: imageSize.height * scale
-  }), [imageSize, scale]);
-
-  const bounds = useMemo(() => {
-    const baseX = (VIEW_SIZE - cropSize) / 2;
-    const baseY = (VIEW_SIZE - cropSize) / 2;
-    const minX = baseX + (cropSize - display.width);
-    const maxX = baseX;
-    const minY = baseY + (cropSize - display.height);
-    const maxY = baseY;
-    return { minX, maxX, minY, maxY, baseX, baseY };
-  }, [cropSize, display.width, display.height]);
-
-  useEffect(() => {
-    if (!imgRef.current) return;
-    const img = imgRef.current;
-    const handleLoad = () => {
-      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-      setBaseScale(Math.max(cropSize / img.naturalWidth, cropSize / img.naturalHeight));
-      setZoom(1);
-      setOffset({ x: 0, y: 0 });
-    };
-    if (img.complete) {
-      handleLoad();
-    } else {
-      img.onload = handleLoad;
-    }
-  }, [src, cropSize]);
-
-  useEffect(() => {
-    if (!imgRef.current || !imageSize.width || !imageSize.height) return;
-    setBaseScale(Math.max(cropSize / imageSize.width, cropSize / imageSize.height));
-  }, [cropSize, imageSize.width, imageSize.height]);
-
-  useEffect(() => {
-    setOffset((prev) => ({
-      x: clamp(prev.x, bounds.minX, bounds.maxX),
-      y: clamp(prev.y, bounds.minY, bounds.maxY)
-    }));
-  }, [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY]);
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    dragRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      offsetX: offset.x,
-      offsetY: offset.y
-    };
+  const handleComplete = (_: Area, pixels: Area) => {
+    setCroppedArea(pixels);
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current) return;
-    const dx = event.clientX - dragRef.current.x;
-    const dy = event.clientY - dragRef.current.y;
-    setOffset({
-      x: clamp(dragRef.current.offsetX + dx, bounds.minX, bounds.maxX),
-      y: clamp(dragRef.current.offsetY + dy, bounds.minY, bounds.maxY)
-    });
-  };
-
-  const handlePointerUp = () => {
-    dragRef.current = null;
-  };
-
-  const handleConfirm = () => {
-    if (!imgRef.current) return;
-    const img = imgRef.current;
+  const handleConfirm = async () => {
+    if (!croppedArea) return;
+    const image = await createImage(src);
     const canvas = document.createElement("canvas");
     canvas.width = OUTPUT_SIZE;
     canvas.height = OUTPUT_SIZE;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const viewSize = cropSize;
-    const sW = viewSize / scale;
-    const sH = viewSize / scale;
-    const x = bounds.baseX + offset.x;
-    const y = bounds.baseY + offset.y;
-    let sx = (-x) / scale;
-    let sy = (-y) / scale;
-    sx = clamp(sx, 0, img.naturalWidth - sW);
-    sy = clamp(sy, 0, img.naturalHeight - sH);
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
 
-    ctx.drawImage(img, sx, sy, sW, sH, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+    const sx = croppedArea.x * scaleX;
+    const sy = croppedArea.y * scaleY;
+    const sWidth = croppedArea.width * scaleX;
+    const sHeight = croppedArea.height * scaleY;
+
+    ctx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
     canvas.toBlob(
       (blob) => {
@@ -520,44 +460,18 @@ function ImageCropper({
   return (
     <Modal title="Ajustar imagem" onClose={onClose}>
       <div className="space-y-4">
-        <div
-          className="relative mx-auto flex h-[320px] w-[320px] cursor-grab items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-        >
-          <img
-            ref={imgRef}
-            src={src}
-            alt="Crop"
-            className="pointer-events-none select-none"
-            style={{
-              width: `${display.width}px`,
-              height: `${display.height}px`,
-              transform: `translate(${offset.x}px, ${offset.y}px)`
-            }}
+        <div className="relative h-[320px] w-full overflow-hidden rounded-2xl bg-slate-900">
+          <Cropper
+            image={src}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            cropShape="rect"
+            showGrid
+            onCropChange={setCrop}
+            onCropComplete={handleComplete}
+            onZoomChange={setZoom}
           />
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 border-2 border-white/80"
-            style={{
-              width: `${cropSize}px`,
-              height: `${cropSize}px`,
-              transform: "translate(-50%, -50%)",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)"
-            }}
-          >
-            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
-              <div className="border-b border-r border-white/50" />
-              <div className="border-b border-r border-white/50" />
-              <div className="border-b border-white/50" />
-              <div className="border-b border-r border-white/50" />
-              <div className="border-b border-r border-white/50" />
-              <div className="border-b border-white/50" />
-              <div className="border-r border-white/50" />
-              <div className="border-r border-white/50" />
-            </div>
-          </div>
         </div>
         <div className="space-y-2">
           <label className="text-sm text-slate-600">Zoom</label>
@@ -568,18 +482,6 @@ function ImageCropper({
             step={0.05}
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}
-            className="w-full"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm text-slate-600">Area de corte</label>
-          <input
-            type="range"
-            min={200}
-            max={320}
-            step={10}
-            value={cropSize}
-            onChange={(event) => setCropSize(Number(event.target.value))}
             className="w-full"
           />
         </div>
@@ -594,7 +496,11 @@ function ImageCropper({
   );
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (Number.isNaN(value)) return min;
-  return Math.min(Math.max(value, min), max);
+function createImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", (err) => reject(err));
+    image.src = src;
+  });
 }

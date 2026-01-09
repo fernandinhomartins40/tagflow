@@ -60,7 +60,7 @@ const parseJsonBody = async (c: Context) => {
 };
 
 authRoutes.post("/login", async (c) => {
-  const tenantId = getTenantId(c);
+  const tenantId = c.get("tenantId") as string | undefined;
   let bodyInput: Record<string, unknown>;
   try {
     bodyInput = await parseJsonBody(c);
@@ -69,13 +69,28 @@ authRoutes.post("/login", async (c) => {
   }
   const body = loginSchema.parse(bodyInput);
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.companyId, tenantId), eq(users.email, body.email)));
+  let user: typeof users.$inferSelect | undefined;
+  if (tenantId) {
+    const [tenantUser] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.companyId, tenantId), eq(users.email, body.email)));
+    user = tenantUser;
+  }
+
+  if (!user) {
+    const [globalUser] = await db.select().from(users).where(eq(users.email, body.email));
+    if (globalUser?.role === "super_admin") {
+      user = globalUser;
+    }
+  }
 
   if (!user) {
     return c.json({ error: "Invalid credentials" }, 401);
+  }
+
+  if (!user.active) {
+    return c.json({ error: "User inactive" }, 403);
   }
 
   const valid = await bcrypt.compare(body.password, user.passwordHash);
@@ -170,6 +185,9 @@ authRoutes.get("/me", async (c) => {
     const [user] = await db.select().from(users).where(and(eq(users.companyId, payload.companyId), eq(users.id, payload.sub)));
     if (!user) {
       return c.json({ error: "Unauthorized" }, 401);
+    }
+    if (!user.active) {
+      return c.json({ error: "User inactive" }, 403);
     }
     return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch {

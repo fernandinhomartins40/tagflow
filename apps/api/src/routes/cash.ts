@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { cashRegisters, tabPayments } from "../schema";
+import { cashRegisters, creditPayments, tabPayments } from "../schema";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
@@ -31,6 +31,13 @@ const buildTotals = (rows: Array<{ method: string; total: number }>) => {
   return totals;
 };
 
+const mergeTotals = (a: ReturnType<typeof buildTotals>, b: ReturnType<typeof buildTotals>) => ({
+  cash: a.cash + b.cash,
+  debit: a.debit + b.debit,
+  credit: a.credit + b.credit,
+  pix: a.pix + b.pix
+});
+
 cashRoutes.get("/open", async (c) => {
   const tenantId = getTenantId(c);
   const branchId = c.req.query("branchId");
@@ -50,7 +57,7 @@ cashRoutes.get("/open", async (c) => {
     return c.json({ data: null });
   }
 
-  const totalsRows = await db
+  const tabTotals = await db
     .select({
       method: tabPayments.method,
       total: sql<number>`coalesce(sum(${tabPayments.amount}), 0)`.mapWith(Number)
@@ -59,7 +66,16 @@ cashRoutes.get("/open", async (c) => {
     .where(and(eq(tabPayments.companyId, tenantId), eq(tabPayments.cashRegisterId, register.id)))
     .groupBy(tabPayments.method);
 
-  return c.json({ data: register, totals: buildTotals(totalsRows) });
+  const creditTotals = await db
+    .select({
+      method: creditPayments.method,
+      total: sql<number>`coalesce(sum(${creditPayments.amount}), 0)`.mapWith(Number)
+    })
+    .from(creditPayments)
+    .where(and(eq(creditPayments.companyId, tenantId), eq(creditPayments.cashRegisterId, register.id)))
+    .groupBy(creditPayments.method);
+
+  return c.json({ data: register, totals: mergeTotals(buildTotals(tabTotals), buildTotals(creditTotals)) });
 });
 
 cashRoutes.post("/open", async (c) => {
@@ -111,7 +127,7 @@ cashRoutes.post("/close", async (c) => {
     return c.json({ error: "Caixa invalido" }, 400);
   }
 
-  const totalsRows = await db
+  const tabTotals = await db
     .select({
       method: tabPayments.method,
       total: sql<number>`coalesce(sum(${tabPayments.amount}), 0)`.mapWith(Number)
@@ -120,7 +136,16 @@ cashRoutes.post("/close", async (c) => {
     .where(and(eq(tabPayments.companyId, tenantId), eq(tabPayments.cashRegisterId, register.id)))
     .groupBy(tabPayments.method);
 
-  const totals = buildTotals(totalsRows);
+  const creditTotals = await db
+    .select({
+      method: creditPayments.method,
+      total: sql<number>`coalesce(sum(${creditPayments.amount}), 0)`.mapWith(Number)
+    })
+    .from(creditPayments)
+    .where(and(eq(creditPayments.companyId, tenantId), eq(creditPayments.cashRegisterId, register.id)))
+    .groupBy(creditPayments.method);
+
+  const totals = mergeTotals(buildTotals(tabTotals), buildTotals(creditTotals));
 
   const [updated] = await db
     .update(cashRegisters)

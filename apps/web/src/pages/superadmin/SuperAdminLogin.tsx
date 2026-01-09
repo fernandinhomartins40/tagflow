@@ -1,0 +1,98 @@
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { apiFetch } from "../../services/api";
+import { useAuthStore } from "../../store/auth";
+import { Button } from "../../components/ui/button";
+
+interface LoginResponse {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+export function SuperAdminLogin() {
+  const navigate = useNavigate();
+  const status = useAuthStore((state) => state.status);
+  const user = useAuthStore((state) => state.user);
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const [email, setEmail] = useState("superadmin@tagflow.local");
+  const [password, setPassword] = useState("admin123");
+  const [error, setError] = useState<string | null>(null);
+
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      return apiFetch<LoginResponse>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
+    },
+    onSuccess: async (data) => {
+      setError(null);
+      setAuth("authenticated", data.user);
+      if (data.user.role !== "super_admin") {
+        await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+        setAuth("unauthenticated");
+        setError("Este usuario nao possui acesso ao super admin.");
+        return;
+      }
+      navigate("/superadmin", { replace: true });
+    },
+    onError: () => {
+      setError("Falha no login.");
+    }
+  });
+
+  useEffect(() => {
+    if (status === "authenticated" && user?.role === "super_admin") {
+      navigate("/superadmin", { replace: true });
+    }
+  }, [status, user?.role, navigate]);
+
+  if (status === "authenticated" && user?.role === "super_admin") {
+    return <Navigate to="/superadmin" replace />;
+  }
+
+  return (
+    <section className="relative mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4 py-12">
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute -top-10 left-1/2 h-64 w-[420px] -translate-x-1/2 rounded-full bg-slate-500/20 blur-[120px]" />
+        <div className="absolute bottom-10 right-10 h-56 w-56 rounded-full bg-emerald-500/20 blur-[140px]" />
+      </div>
+      <div className="w-full max-w-md space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:p-8">
+        <header className="space-y-2 text-center">
+          <img src="/logo-tagflow.png" alt="Tagflow" className="mx-auto h-14 w-auto" />
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Super admin</p>
+          <h2 className="text-2xl font-semibold">Entrar no painel</h2>
+          <p className="text-sm text-slate-500">Use seu email e senha.</p>
+        </header>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Email</label>
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400/60 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Senha</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400/60 focus:outline-none"
+            />
+          </div>
+          <Button className="w-full bg-emerald-500 text-white hover:bg-emerald-400" onClick={() => loginMutation.mutate()}>
+            {loginMutation.isPending ? "Entrando..." : "Entrar"}
+          </Button>
+          {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -8,6 +8,8 @@ import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
 import { ScannerModal } from "../../components/ScannerModal";
 import { useNfcReader } from "../../hooks/useNfcReader";
+import { formatCurrencyInput, formatCurrencyValue, parseCurrencyInput } from "../../utils/currency";
+import { AddCreditModal, type PaymentMethod } from "../../components/AddCreditModal";
 
 interface Customer {
   id: string;
@@ -68,6 +70,7 @@ interface CartItem {
   endAt?: string;
   participants?: Array<{ customerId: string; amount: number }>;
   conflict?: BookingConflict | null;
+  paymentMethod?: PaymentMethod;
 }
 
 const priceUnits = {
@@ -88,7 +91,7 @@ const quickActions = [
 export function AdminPdv() {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [activeModal, setActiveModal] = useState<"products" | "services" | "locations" | "credit" | null>(null);
+  const [activeModal, setActiveModal] = useState<"products" | "services" | "locations" | null>(null);
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [identifyMethod, setIdentifyMethod] = useState<"nfc" | "qr" | "barcode" | "number" | "search">("nfc");
   const [identifier, setIdentifier] = useState("");
@@ -104,9 +107,12 @@ export function AdminPdv() {
   const [locationStart, setLocationStart] = useState("");
   const [locationEnd, setLocationEnd] = useState("");
   const [locationTotal, setLocationTotal] = useState("");
-  const [creditAmount, setCreditAmount] = useState("");
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
   const [locationConflict, setLocationConflict] = useState<BookingConflict | null>(null);
   const [confirmReserved, setConfirmReserved] = useState(false);
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [locationTarget, setLocationTarget] = useState<Location | null>(null);
+  const [locationNotice, setLocationNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const [participantSearch, setParticipantSearch] = useState("");
   const [participantIdentifier, setParticipantIdentifier] = useState("");
@@ -179,10 +185,10 @@ export function AdminPdv() {
   });
 
   const addCreditsMutation = useMutation({
-    mutationFn: async (payload: { customerId: string; amount: number }) => {
+    mutationFn: async (payload: { customerId: string; amount: number; paymentMethod: PaymentMethod }) => {
       return apiFetch(`/api/customers/${payload.customerId}/add-credits`, {
         method: "POST",
-        body: JSON.stringify({ amount: payload.amount })
+        body: JSON.stringify({ amount: payload.amount, paymentMethod: payload.paymentMethod })
       });
     }
   });
@@ -235,7 +241,14 @@ export function AdminPdv() {
   useEffect(() => {
     setLocationConflict(null);
     setConfirmReserved(false);
-  }, [locationStart, locationEnd]);
+  }, [locationStart, locationEnd, locationTarget?.id]);
+
+  useEffect(() => {
+    if (!locationTarget) return;
+    if (!locationStart || !locationEnd) return;
+    const { total } = resolveLocationCharge(locationTarget);
+    setLocationTotal(formatCurrencyValue(total));
+  }, [locationStart, locationEnd, locationTarget]);
 
   const addItem = (item: CartItem) => {
     setCartItems((prev) => {
@@ -256,6 +269,10 @@ export function AdminPdv() {
       }
       return prev.map((p) => (p.key === key ? { ...p, quantity: p.quantity - 1 } : p));
     });
+  };
+
+  const removeItemAll = (key: string) => {
+    setCartItems((prev) => prev.filter((p) => p.key !== key));
   };
 
   const openIdentifyModal = () => {
@@ -309,7 +326,11 @@ export function AdminPdv() {
         if (!customer.data) {
           throw new Error("Cliente nao encontrado para inserir credito");
         }
-        await addCreditsMutation.mutateAsync({ customerId: customer.data.id, amount: item.price });
+        await addCreditsMutation.mutateAsync({
+          customerId: customer.data.id,
+          amount: item.price,
+          paymentMethod: item.paymentMethod ?? "cash"
+        });
         continue;
       }
 
@@ -358,27 +379,34 @@ export function AdminPdv() {
 
   const calcLocationTotal = (location: Location | undefined) => {
     if (!location || !locationStart || !locationEnd) return;
+    const { total } = resolveLocationCharge(location);
+    setLocationTotal(formatCurrencyValue(total));
+  };
+
+  const resolveLocationCharge = (location: Location) => {
     const start = new Date(locationStart);
     const end = new Date(locationEnd);
     const diffMs = end.getTime() - start.getTime();
-    if (diffMs <= 0) return;
     const price = Number(location.price);
-    let total = price;
+    if (diffMs <= 0 || !Number.isFinite(price)) {
+      return { quantity: 1, total: price };
+    }
+    let quantity = 1;
     switch (location.priceUnit) {
       case "hour":
-        total = price * (diffMs / 3_600_000);
+        quantity = Math.max(1, Math.ceil(diffMs / 3_600_000));
         break;
       case "day":
-        total = price * (diffMs / 86_400_000);
+        quantity = Math.max(1, Math.ceil(diffMs / 86_400_000));
         break;
       case "month":
-        total = price * (diffMs / 2_592_000_000);
+        quantity = Math.max(1, Math.ceil(diffMs / 2_592_000_000));
         break;
       case "period":
       default:
-        total = price;
+        quantity = 1;
     }
-    setLocationTotal(total.toFixed(2));
+    return { quantity, total: price * quantity };
   };
 
   const checkLocationConflict = async (locationId: string) => {
@@ -393,23 +421,42 @@ export function AdminPdv() {
   const addLocationToCart = async (location: Location) => {
     if (!locationStart || !locationEnd) {
       setError("Informe horario da locacao.");
-      return;
+      setLocationNotice({ type: "error", message: "Informe horario da locacao." });
+      return false;
+    }
+    const alreadyAdded = cartItems.some((item) => item.type === "location" && item.id === location.id);
+    if (alreadyAdded) {
+      setError("Este local ja esta na lista de itens do PDV.");
+      setLocationNotice({ type: "error", message: "Este local ja esta na lista de itens do PDV." });
+      return false;
+    }
+    const hasOverlap = cartItems.some((item) => {
+      if (item.type !== "location" || item.id !== location.id || !item.startAt || !item.endAt) return false;
+      const existingStart = new Date(item.startAt).getTime();
+      const existingEnd = new Date(item.endAt).getTime();
+      const nextStart = new Date(locationStart).getTime();
+      const nextEnd = new Date(locationEnd).getTime();
+      return nextStart < existingEnd && nextEnd > existingStart;
+    });
+    if (hasOverlap) {
+      setError("Este local ja esta na lista de itens para o mesmo periodo.");
+      setLocationNotice({ type: "error", message: "Este local ja esta na lista de itens para o mesmo periodo." });
+      return false;
     }
     const conflict = await checkLocationConflict(location.id);
     if (conflict && !confirmReserved) {
       setError("Local reservado. Confirme o atendimento para continuar.");
-      return;
+      setLocationNotice({ type: "error", message: "Local reservado. Confirme o atendimento para continuar." });
+      return false;
     }
-    if (!locationTotal) {
-      calcLocationTotal(location);
-    }
+    const { quantity, total } = resolveLocationCharge(location);
     addItem({
       key: `location-${location.id}-${locationStart}-${locationEnd}`,
       type: "location",
       id: location.id,
       name: location.name,
-      price: Number(locationTotal || location.price),
-      quantity: 1,
+      price: parseCurrencyInput(locationTotal) || Number(location.price),
+      quantity,
       startAt: new Date(locationStart).toISOString(),
       endAt: new Date(locationEnd).toISOString(),
       conflict: conflict ?? null
@@ -417,6 +464,45 @@ export function AdminPdv() {
     setConfirmReserved(false);
     setLocationConflict(null);
     setError(null);
+    setLocationNotice({ type: "success", message: "Local adicionado na comanda." });
+    return true;
+  };
+
+  const toLocalInputValue = (date: Date) => {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const openLocationModal = (location: Location) => {
+    const now = new Date();
+    const end = new Date(now.getTime() + 60 * 60 * 1000);
+    setLocationTarget(location);
+    setLocationStart(toLocalInputValue(now));
+    setLocationEnd(toLocalInputValue(end));
+    setLocationTotal(formatCurrencyValue(Number(location.price)));
+    setError(null);
+    setLocationModalOpen(true);
+  };
+
+  const adjustLocationEnd = (minutes: number) => {
+    if (!locationEnd) return;
+    const current = new Date(locationEnd);
+    const adjusted = new Date(current.getTime() + minutes * 60 * 1000);
+    setLocationEnd(toLocalInputValue(adjusted));
+  };
+
+  const getLocationStepMinutes = (unit: Location["priceUnit"]) => {
+    switch (unit) {
+      case "hour":
+        return 60;
+      case "day":
+        return 1440;
+      case "month":
+        return 43200;
+      case "period":
+      default:
+        return 30;
+    }
   };
 
   const openParticipantModal = (key: string) => {
@@ -447,6 +533,10 @@ export function AdminPdv() {
                 navigate("/admin/identifiers");
                 return;
               }
+              if (action.key === "credit") {
+                setCreditModalOpen(true);
+                return;
+              }
               setActiveModal(action.key);
               setError(null);
             }}
@@ -463,6 +553,17 @@ export function AdminPdv() {
           <h3 className="text-lg font-semibold">Itens da comanda</h3>
           <span className="text-xs text-slate-400">{cartItems.length} item(s)</span>
         </div>
+        {locationNotice ? (
+          <div
+            className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+              locationNotice.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-rose-200 bg-rose-50 text-rose-600"
+            }`}
+          >
+            {locationNotice.message}
+          </div>
+        ) : null}
         <div className="mt-3 space-y-2">
           {cartItems.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum item selecionado.</p>
@@ -473,11 +574,26 @@ export function AdminPdv() {
                   <p className="text-sm font-medium">{item.name}</p>
                   <p className="text-xs text-slate-500">R$ {item.price.toFixed(2)} {item.type === "location" && item.startAt ? "- locacao" : ""}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {item.type === "location" ? (
-                    <Button size="sm" variant="outline" onClick={() => openParticipantModal(item.key)}>
-                      Dividir
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="!border-amber-300 !text-amber-700 hover:!bg-amber-50"
+                        onClick={() => openParticipantModal(item.key)}
+                      >
+                        Dividir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="!border-rose-300 !text-rose-700 hover:!bg-rose-50"
+                        onClick={() => removeItemAll(item.key)}
+                      >
+                        Remover
+                      </Button>
+                    </>
                   ) : null}
                   <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
                     -
@@ -503,7 +619,7 @@ export function AdminPdv() {
 
       {activeModal ? (
         <Modal
-          title={activeModal === "products" ? "Produtos" : activeModal === "services" ? "Servicos" : activeModal === "locations" ? "Locais" : "Credito pre-pago"}
+          title={activeModal === "products" ? "Produtos" : activeModal === "services" ? "Servicos" : "Locais"}
           onClose={() => {
             setActiveModal(null);
             setError(null);
@@ -515,7 +631,7 @@ export function AdminPdv() {
               if (activeModal === "products") return item.type === "product";
               if (activeModal === "services") return item.type === "service";
               if (activeModal === "locations") return item.type === "location";
-              return item.type === "credit";
+              return false;
             }).length}
           </div>
           {activeModal === "products" ? (
@@ -587,29 +703,13 @@ export function AdminPdv() {
           ) : null}
           {activeModal === "locations" ? (
             <div className="space-y-4">
-              <div className="grid gap-2 md:grid-cols-3">
-                <input type="datetime-local" value={locationStart} onChange={(event) => setLocationStart(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
-                <input type="datetime-local" value={locationEnd} onChange={(event) => setLocationEnd(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2" />
-                <input value={locationTotal} onChange={(event) => setLocationTotal(event.target.value)} placeholder="Total" className="w-full rounded-xl border border-slate-200 px-3 py-2" />
-              </div>
-              {locationConflict ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  Local reservado. Cliente: {locationConflict.customerName ?? "Nao informado"}.
-                </div>
-              ) : null}
-              {locationConflict ? (
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input type="checkbox" checked={confirmReserved} onChange={(event) => setConfirmReserved(event.target.checked)} />
-                  Confirmar atendimento da reserva
-                </label>
-              ) : null}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {locationsQuery.data?.data?.map((location) => (
                   <ItemCard
                     key={location.id}
                     title={`${location.name} - R$ ${location.price}/${priceUnits[location.priceUnit]}`}
                     price={Number(location.price)}
-                    onAdd={() => addLocationToCart(location)}
+                    onAdd={() => openLocationModal(location)}
                     onRemove={() => removeItem(`location-${location.id}-${locationStart}-${locationEnd}`)}
                   />
                 ))}
@@ -626,39 +726,6 @@ export function AdminPdv() {
                           {item.startAt ? new Date(item.startAt).toLocaleString("pt-BR") : ""} -{" "}
                           {item.endAt ? new Date(item.endAt).toLocaleString("pt-BR") : ""}
                         </p>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
-                        Remover
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ) : null}
-          {activeModal === "credit" ? (
-            <div className="space-y-3">
-              <input
-                placeholder="Valor de credito pre-pago"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2"
-                value={creditAmount}
-                onChange={(event) => setCreditAmount(event.target.value)}
-              />
-              <Button onClick={() => {
-                if (!creditAmount) return;
-                addItem({ key: `credit-${Date.now()}`, type: "credit", name: "Credito", price: Number(creditAmount), quantity: 1 });
-                setCreditAmount("");
-              }}>
-                Adicionar credito pre-pago
-              </Button>
-              {error ? <p className="text-sm text-rose-500">{error}</p> : null}
-              <div className="mt-4 space-y-2">
-                {cartItems
-                  .filter((item) => item.type === "credit")
-                  .map((item) => (
-                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium">Credito</p>
-                        <p className="text-xs text-slate-500">R$ {item.price.toFixed(2)}</p>
                       </div>
                       <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
                         Remover
@@ -774,7 +841,7 @@ export function AdminPdv() {
             />
             <input
               value={participantAmount}
-              onChange={(event) => setParticipantAmount(event.target.value)}
+              onChange={(event) => setParticipantAmount(formatCurrencyInput(event.target.value))}
               placeholder="Valor"
               className="w-full rounded-xl border border-slate-200 px-3 py-2"
             />
@@ -787,7 +854,7 @@ export function AdminPdv() {
                 const target = cartItems.find((c) => c.key === participantTargetKey);
                 const list = target?.participants ?? [];
                 if (list.some((p) => p.customerId === res.data!.id)) return;
-                updateParticipants([...list, { customerId: res.data.id, amount: Number(participantAmount) || 0 }]);
+                updateParticipants([...list, { customerId: res.data.id, amount: parseCurrencyInput(participantAmount) || 0 }]);
                 setParticipantIdentifier("");
                 setParticipantAmount("");
               }}
@@ -798,14 +865,123 @@ export function AdminPdv() {
         </Modal>
       ) : null}
 
+      {locationModalOpen && locationTarget ? (
+        <Modal title={`Adicionar ${locationTarget.name}`} onClose={() => setLocationModalOpen(false)}>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              Valor base: R$ {Number(locationTarget.price).toFixed(2)} / {priceUnits[locationTarget.priceUnit]}
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+              Quantidade calculada: {resolveLocationCharge(locationTarget).quantity}
+            </div>
+            {locationNotice ? (
+              <div
+                className={`rounded-xl border px-3 py-2 text-sm ${
+                  locationNotice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-rose-200 bg-rose-50 text-rose-600"
+                }`}
+              >
+                {locationNotice.message}
+              </div>
+            ) : null}
+            {error ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
+                {error}
+              </div>
+            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Inicio</label>
+                <input
+                  type="datetime-local"
+                  value={locationStart}
+                  onChange={(event) => setLocationStart(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Fim</label>
+                <input
+                  type="datetime-local"
+                  value={locationEnd}
+                  onChange={(event) => setLocationEnd(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => adjustLocationEnd(-getLocationStepMinutes(locationTarget.priceUnit))}>
+                    -{getLocationStepMinutes(locationTarget.priceUnit)} min
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => adjustLocationEnd(getLocationStepMinutes(locationTarget.priceUnit))}>
+                    +{getLocationStepMinutes(locationTarget.priceUnit)} min
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Total</label>
+                <input
+                  value={locationTotal}
+                  onChange={(event) => setLocationTotal(formatCurrencyInput(event.target.value))}
+                  onBlur={() => calcLocationTotal(locationTarget)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                />
+              </div>
+            </div>
+            {locationConflict ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Local reservado. Cliente: {locationConflict.customerName ?? "Nao informado"}.
+              </div>
+            ) : null}
+            {locationConflict ? (
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={confirmReserved} onChange={(event) => setConfirmReserved(event.target.checked)} />
+                Confirmar atendimento da reserva
+              </label>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setLocationModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!locationTarget) return;
+                  const success = await addLocationToCart(locationTarget);
+                  if (success) {
+                    setLocationModalOpen(false);
+                  }
+                }}
+              >
+                Adicionar
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
       <ScannerModal
         open={scanOpen}
         onClose={() => setScanOpen(false)}
+        mode={scanType}
         onScan={(value) => {
           if (scanType === "qr" || scanType === "barcode") {
             setIdentifier(value);
           }
           setScanOpen(false);
+        }}
+      />
+      <AddCreditModal
+        open={creditModalOpen}
+        onClose={() => setCreditModalOpen(false)}
+        onConfirm={(amount, method) => {
+          addItem({
+            key: `credit-${Date.now()}`,
+            type: "credit",
+            name: "Credito",
+            price: amount,
+            quantity: 1,
+            paymentMethod: method
+          });
+          setCreditModalOpen(false);
         }}
       />
     </section>
@@ -869,3 +1045,4 @@ function ItemCard({ title, imageUrl, price, onAdd, onRemove }: { title: string; 
     </div>
   );
 }
+

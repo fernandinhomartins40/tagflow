@@ -13,6 +13,30 @@ export const companies = pgTable("companies", {
   renewedAt: timestamp("renewed_at", { withTimezone: true })
 });
 
+export const plans = pgTable("plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  priceMonthly: numeric("price_monthly", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("brl"),
+  stripePriceId: text("stripe_price_id"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const companySubscriptions = pgTable("company_subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  planId: uuid("plan_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  status: text("status"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
 export const branches = pgTable("branches", {
   id: uuid("id").defaultRandom().primaryKey(),
   companyId: uuid("company_id").notNull(),
@@ -218,5 +242,16 @@ export const tabPayments = pgTable("tab_payments", {
   cashRegisterId: uuid("cash_register_id"),
   method: text("method").notNull(), // cash | debit | credit | pix
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const creditPayments = pgTable("credit_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull(),
+  customerId: uuid("customer_id").notNull(),
+  cashRegisterId: uuid("cash_register_id"),
+  method: text("method").notNull(), // cash | debit | credit | pix
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });

@@ -1,4 +1,5 @@
 import { Route, Routes, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminCustomers } from "./pages/admin/AdminCustomers";
 import { AdminPdv } from "./pages/admin/AdminPdv";
@@ -13,18 +14,50 @@ import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminTabs } from "./pages/admin/AdminTabs";
 import { AdminIdentifiers } from "./pages/admin/AdminIdentifiers";
 import { AdminCash } from "./pages/admin/AdminCash";
+import { SuperAdminShell } from "./components/SuperAdminShell";
 import { PublicBalance } from "./pages/public/PublicBalance";
 import { PublicHistory } from "./pages/public/PublicHistory";
 import { AppShell } from "./components/AppShell";
 import { useAuthStore } from "./store/auth";
+import { useTenantStore } from "./store/tenant";
+import { getApiBaseUrl } from "./services/config";
 import { MarketingLanding } from "./pages/MarketingLanding";
+import { SuperAdminLogin } from "./pages/superadmin/SuperAdminLogin";
 
 export default function App() {
   const status = useAuthStore((state) => state.status);
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const tenantId = useTenantStore((state) => state.tenantId);
+  const apiBaseUrl = getApiBaseUrl();
+
+  useEffect(() => {
+    if (status !== "unknown") return;
+    let active = true;
+    fetch(`${apiBaseUrl}/api/auth/me`, {
+      headers: { "X-Tenant-Id": tenantId },
+      credentials: "include"
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return;
+        if (data?.user) {
+          setAuth("authenticated", data.user);
+        } else {
+          setAuth("unauthenticated");
+        }
+      })
+      .catch(() => {
+        if (active) setAuth("unauthenticated");
+      });
+    return () => {
+      active = false;
+    };
+  }, [status, tenantId, setAuth, apiBaseUrl]);
 
   return (
     <Routes>
       <Route path="/" element={<MarketingLanding />} />
+      <Route path="/superadmin/login" element={<SuperAdminLogin />} />
       <Route element={<AppShell />}>
         <Route
           path="/login"
@@ -46,6 +79,7 @@ export default function App() {
         <Route path="/public/balance" element={<PublicBalance />} />
         <Route path="/public/history" element={<PublicHistory />} />
       </Route>
+      <Route path="/superadmin" element={<RequireSuperAdmin status={status}><SuperAdminShell /></RequireSuperAdmin>} />
     </Routes>
   );
 }
@@ -56,6 +90,20 @@ function RequireAuth({ status, children }: { status: "unknown" | "authenticated"
   }
   if (status !== "authenticated") {
     return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+function RequireSuperAdmin({ status, children }: { status: "unknown" | "authenticated" | "unauthenticated"; children: JSX.Element }) {
+  const user = useAuthStore((state) => state.user);
+  if (status === "unknown") {
+    return <AuthLoading />;
+  }
+  if (status !== "authenticated") {
+    return <Navigate to="/superadmin/login" replace />;
+  }
+  if (user?.role !== "super_admin") {
+    return <Navigate to="/admin/pdv" replace />;
   }
   return children;
 }

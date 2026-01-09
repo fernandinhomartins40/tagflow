@@ -1,6 +1,9 @@
 import { Context, Next } from "hono";
 import { getCookie } from "hono/cookie";
 import jwt from "jsonwebtoken";
+import { db } from "../db";
+import { users } from "../schema";
+import { and, eq } from "drizzle-orm";
 
 const jwtSecret = process.env.JWT_SECRET ?? "";
 const accessCookieName = "tf_access";
@@ -16,6 +19,10 @@ export const authMiddleware = async (c: Context, next: Next) => {
 
   try {
     const payload = jwt.verify(token, jwtSecret) as { sub: string; role: string; companyId: string };
+    const [user] = await db.select().from(users).where(and(eq(users.id, payload.sub), eq(users.companyId, payload.companyId)));
+    if (!user || !user.active) {
+      return c.json({ error: "User inactive" }, 403);
+    }
     const tenantId = c.get("tenantId") as string | undefined;
     if (tenantId && payload.role !== "super_admin" && payload.companyId !== tenantId) {
       return c.json({ error: "Tenant mismatch" }, 403);

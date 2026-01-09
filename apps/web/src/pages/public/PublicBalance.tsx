@@ -12,6 +12,7 @@ interface BalanceResponse {
 export function PublicBalance() {
   const [manual, setManual] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
   const nfc = useNfcReader();
   const [balance, setBalance] = useState<string | null>(null);
 
@@ -36,8 +37,11 @@ export function PublicBalance() {
           <Button variant="outline" onClick={() => nfc.start()}>
             Ler NFC
           </Button>
-          <Button variant="outline" onClick={() => setScannerOpen(true)}>
-            Scan camera
+          <Button variant="outline" onClick={() => { setScannerMode("qr"); setScannerOpen(true); }}>
+            QR Code
+          </Button>
+          <Button variant="outline" onClick={() => { setScannerMode("barcode"); setScannerOpen(true); }}>
+            Codigo de barras
           </Button>
         </div>
         <p className="mt-2 text-xs text-slate-500">Status: {nfc.status}</p>
@@ -62,6 +66,7 @@ export function PublicBalance() {
       <ScannerModal
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
+        mode={scannerMode}
         onScan={(value) => setManual(value)}
       />
     </section>

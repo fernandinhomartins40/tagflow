@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { customers, customerIdentifiers, transactions } from "../schema";
+import { cashRegisters, creditPayments, customers, customerIdentifiers, transactions } from "../schema";
 import { and, eq, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
@@ -26,7 +26,8 @@ const identifierSchema = z.object({
 
 const creditSchema = z.object({
   amount: z.coerce.number().positive(),
-  description: z.string().optional().nullable()
+  description: z.string().optional().nullable(),
+  paymentMethod: z.enum(["cash", "debit", "credit", "pix"])
 });
 
 export const customersRoutes = new Hono();
@@ -123,6 +124,14 @@ customersRoutes.post("/:id/add-credits", async (c) => {
   const id = c.req.param("id");
   const body = creditSchema.parse(await c.req.json());
 
+  const [cashRegister] = await db
+    .select()
+    .from(cashRegisters)
+    .where(and(eq(cashRegisters.companyId, tenantId), eq(cashRegisters.status, "open")));
+  if (!cashRegister) {
+    return c.json({ error: "Caixa fechado" }, 400);
+  }
+
   await db
     .update(customers)
     .set({ credits: sql`${customers.credits} + ${body.amount}` })
@@ -134,6 +143,15 @@ customersRoutes.post("/:id/add-credits", async (c) => {
     type: "credit",
     amount: body.amount.toString(),
     description: body.description ?? "Credito adicionado"
+  });
+
+  await db.insert(creditPayments).values({
+    companyId: tenantId,
+    customerId: id,
+    cashRegisterId: cashRegister.id,
+    method: body.paymentMethod,
+    amount: body.amount.toString(),
+    description: body.description ?? "Credito pre-pago"
   });
 
   return c.json({ id, added: body.amount });

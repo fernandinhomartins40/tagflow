@@ -2,6 +2,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
+import { formatCurrencyInput, parseCurrencyInput } from "../../utils/currency";
 
 interface CashRegister {
   id: string;
@@ -54,7 +55,7 @@ export function AdminCash() {
   const openMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        openingFloat: Number(openingFloat) || 0,
+        openingFloat: parseCurrencyInput(openingFloat),
         notes: openingNotes || undefined
       };
       return apiFetch("/api/cash/open", { method: "POST", body: JSON.stringify(payload) });
@@ -72,7 +73,7 @@ export function AdminCash() {
       if (!openQuery.data?.data?.id) throw new Error("Caixa nao encontrado");
       const payload = {
         cashRegisterId: openQuery.data.data.id,
-        closingFloat: closingFloat ? Number(closingFloat) : undefined,
+        closingFloat: closingFloat ? parseCurrencyInput(closingFloat) : undefined,
         notes: closingNotes || undefined
       };
       return apiFetch("/api/cash/close", { method: "POST", body: JSON.stringify(payload) });
@@ -89,7 +90,7 @@ export function AdminCash() {
   const totals = openQuery.data?.totals ?? { cash: 0, debit: 0, credit: 0, pix: 0 };
   const openingValue = Number(openRegister?.openingFloat ?? 0);
   const expectedCash = openingValue + totals.cash;
-  const closingValue = Number(closingFloat || 0);
+  const closingValue = parseCurrencyInput(closingFloat);
   const cashDiff = closingFloat ? closingValue - expectedCash : null;
 
   return (
@@ -107,7 +108,7 @@ export function AdminCash() {
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <input
               value={openingFloat}
-              onChange={(event) => setOpeningFloat(event.target.value)}
+              onChange={(event) => setOpeningFloat(formatCurrencyInput(event.target.value))}
               placeholder="Troco inicial (dinheiro)"
               className="w-full rounded-xl border border-brand-100 px-3 py-2"
             />
@@ -159,7 +160,7 @@ export function AdminCash() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <input
               value={closingFloat}
-              onChange={(event) => setClosingFloat(event.target.value)}
+              onChange={(event) => setClosingFloat(formatCurrencyInput(event.target.value))}
               placeholder="Conferencia: dinheiro contado"
               className="w-full rounded-xl border border-brand-100 px-3 py-2"
             />

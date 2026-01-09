@@ -4,6 +4,12 @@ import { companies } from "../schema";
 import { eq } from "drizzle-orm";
 
 export const tenantMiddleware = async (c: Context, next: Next) => {
+  const path = c.req.path;
+  if (path.startsWith("/api/superadmin") || path.startsWith("/superadmin") || path.startsWith("/api/stripe/webhook")) {
+    await next();
+    return;
+  }
+
   const headerTenantId = c.req.header("x-tenant-id");
   if (headerTenantId) {
     c.set("tenantId", headerTenantId);
