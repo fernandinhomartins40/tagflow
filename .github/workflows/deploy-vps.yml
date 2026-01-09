@@ -106,9 +106,32 @@ jobs:
             docker-compose -f docker-compose.vps.yml build --no-cache --pull
             docker-compose -f docker-compose.vps.yml up -d --remove-orphans
 
-            DB_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q db)
+            for i in {1..30}; do
+              DB_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q db || true)
+              if [ -n "$DB_CONTAINER" ]; then
+                break
+              fi
+              echo "Aguardando container do banco..."
+              sleep 2
+            done
+
             if [ -z "$DB_CONTAINER" ]; then
               echo "Container do banco não encontrado."
+              docker-compose -f docker-compose.vps.yml ps
+              exit 1
+            fi
+
+            for i in {1..30}; do
+              if docker exec -i "$DB_CONTAINER" pg_isready -U tagflow -d tagflow >/dev/null 2>&1; then
+                break
+              fi
+              echo "Aguardando banco ficar pronto..."
+              sleep 2
+            done
+
+            if ! docker exec -i "$DB_CONTAINER" pg_isready -U tagflow -d tagflow >/dev/null 2>&1; then
+              echo "Banco não ficou pronto a tempo."
+              docker logs "$DB_CONTAINER" --tail=200 || true
               exit 1
             fi
 
@@ -116,7 +139,7 @@ jobs:
               -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename text primary key, applied_at timestamptz default now());"
 
             MIGRATIONS_DIR="${APP_DIR}/apps/api/drizzle"
-            for file in $(ls -1 ${MIGRATIONS_DIR}/[0-9][0-9][0-9][0-9]_*.sql | sort); do
+            for file in $(ls -1 ${MIGRATIONS_DIR}/[0-9][0-9][0-9][0-9]_*.sql 2>/dev/null | sort); do
               fname=$(basename "$file")
               applied=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT 1 FROM schema_migrations WHERE filename='${fname}';" | tr -d '[:space:]')
               if [ -z "$applied" ]; then
