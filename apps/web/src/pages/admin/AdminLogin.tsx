@@ -28,6 +28,7 @@ export function AdminLogin() {
 
   const isAndroid =
     typeof window !== "undefined" && /android/i.test(window.navigator.userAgent);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -103,20 +104,27 @@ export function AdminLogin() {
               <div className="rounded-2xl border border-orange-300/30 bg-orange-500/10 p-3 text-xs text-orange-100/80">
                 <p className="text-sm font-semibold text-orange-100">Instale o app no Android</p>
                 <p className="mt-1 text-xs text-orange-100/70">
-                  {installPrompt ? "Toque para instalar o Tagflow na tela inicial." : "No menu do navegador, toque em Adicionar a tela inicial."}
+                  {installPrompt ? "Toque para instalar o Tagflow na tela inicial." : "Use o menu do navegador para adicionar o app."}
                 </p>
-                {installPrompt ? (
-                  <Button
-                    className="mt-3 w-full bg-orange-500 text-slate-950 hover:bg-orange-400"
-                    onClick={async () => {
-                      const prompt = installPrompt;
-                      setInstallPrompt(null);
-                      await prompt.prompt();
-                      await prompt.userChoice;
-                    }}
-                  >
-                    Instalar app
-                  </Button>
+                <Button
+                  className="mt-3 w-full bg-orange-500 text-slate-950 hover:bg-orange-400"
+                  onClick={async () => {
+                    if (!installPrompt) {
+                      setShowInstallHelp(true);
+                      return;
+                    }
+                    const prompt = installPrompt;
+                    setInstallPrompt(null);
+                    await prompt.prompt();
+                    await prompt.userChoice;
+                  }}
+                >
+                  {installPrompt ? "Instalar app" : "Como instalar"}
+                </Button>
+                {showInstallHelp ? (
+                  <p className="mt-2 text-xs text-orange-100/70">
+                    Toque nos três pontos do navegador e escolha "Adicionar à tela inicial".
+                  </p>
                 ) : null}
               </div>
             ) : null}
