@@ -44,7 +44,8 @@ export function useNfcReader() {
       };
 
       reader.onreadingerror = () => {
-        setStatus("erro de leitura");
+        setData(null);
+        setStatus("detectado");
       };
     } catch (error) {
       setStatus("erro");
