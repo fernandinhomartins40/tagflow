@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { Nfc, Barcode, QrCode, Hash } from "lucide-react";
@@ -7,6 +7,7 @@ import { apiFetch } from "../../services/api";
 import { formatCurrencyInput, formatCurrencyValue, parseCurrencyInput } from "../../utils/currency";
 import { ScannerModal } from "../../components/ScannerModal";
 import { AddCreditModal, type PaymentMethod } from "../../components/AddCreditModal";
+import { useNfcReader } from "../../hooks/useNfcReader";
 
 interface Customer {
   id: string;
@@ -207,7 +208,16 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
       <Button size="sm" onClick={() => onLink(type, code)}>
         Vincular
       </Button>
-      {nfcDialogOpen ? <NfcDialog onClose={() => setNfcDialogOpen(false)} /> : null}
+      {nfcDialogOpen ? (
+        <NfcDialog
+          onClose={() => setNfcDialogOpen(false)}
+          onRead={(value) => {
+            setCode(value);
+            onLink(type, value);
+            setNfcDialogOpen(false);
+          }}
+        />
+      ) : null}
       {scannerOpen ? (
         <ScannerModal
           open={scannerOpen}
@@ -220,8 +230,24 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
   );
 }
 
-function NfcDialog({ onClose }: { onClose: () => void }) {
+function NfcDialog({ onClose, onRead }: { onClose: () => void; onRead: (value: string) => void }) {
   if (typeof document === "undefined") return null;
+  const nfc = useNfcReader();
+  const lastReadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    nfc.clear();
+    nfc.start();
+    return () => nfc.stop();
+  }, []);
+
+  useEffect(() => {
+    if (!nfc.data) return;
+    if (lastReadRef.current === nfc.data) return;
+    lastReadRef.current = nfc.data;
+    onRead(nfc.data);
+  }, [nfc.data, onRead]);
+
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-5 text-center shadow-lg">
@@ -231,6 +257,21 @@ function NfcDialog({ onClose }: { onClose: () => void }) {
         </div>
         <h3 className="mt-4 text-lg font-semibold text-slate-900">Aguardando NFC</h3>
         <p className="mt-2 text-sm text-slate-600">Encoste a pulseira/cartao para ler o identificador automaticamente.</p>
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+            nfc.status === "lido"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : nfc.status.includes("erro")
+                ? "border-rose-200 bg-rose-50 text-rose-600"
+                : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}
+        >
+          {nfc.status === "lido" && nfc.data
+            ? `Leitura OK: ${nfc.data}`
+            : nfc.status.includes("erro")
+              ? "Falha ao ler NFC. Tente novamente."
+              : "Aguardando leitura NFC..."}
+        </div>
         <Button className="mt-4 w-full" variant="outline" onClick={onClose}>
           Fechar
         </Button>

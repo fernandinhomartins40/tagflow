@@ -217,6 +217,7 @@ export function AdminPdv() {
 
   useEffect(() => {
     if (identifyOpen) {
+      nfc.clear();
       nfc.start();
     }
   }, [identifyOpen]);
@@ -787,8 +788,22 @@ export function AdminPdv() {
               </div>
             ) : null}
 
-            {nfc.data && identifyMethod === "nfc" ? (
-              <div className="rounded-xl bg-slate-100 p-3 text-sm text-slate-600">NFC lido: {nfc.data}</div>
+            {identifyMethod === "nfc" ? (
+              <div
+                className={`rounded-xl border p-3 text-sm ${
+                  nfc.status === "lido"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : nfc.status.includes("erro")
+                      ? "border-rose-200 bg-rose-50 text-rose-600"
+                      : "border-slate-200 bg-slate-50 text-slate-600"
+                }`}
+              >
+                {nfc.status === "lido" && nfc.data
+                  ? `Leitura OK: ${nfc.data}`
+                  : nfc.status.includes("erro")
+                    ? "Falha ao ler NFC. Aproxime novamente."
+                    : "Aguardando leitura NFC..."}
+              </div>
             ) : null}
 
             <div className="grid gap-2 sm:grid-cols-2">

@@ -11,6 +11,10 @@ export function useNfcReader() {
     setStatus("stopped");
   }, []);
 
+  const clear = useCallback(() => {
+    setData(null);
+  }, []);
+
   const start = useCallback(async () => {
     if (!("NDEFReader" in window)) {
       setStatus("NFC nao suportado");
@@ -18,6 +22,7 @@ export function useNfcReader() {
     }
 
     try {
+      setData(null);
       setStatus("aguardando");
       const reader = new (window as any).NDEFReader();
       const controller = new AbortController();
@@ -25,12 +30,15 @@ export function useNfcReader() {
       await reader.scan({ signal: controller.signal });
 
       reader.onreading = (event: any) => {
+        const serial = event.serialNumber;
         const record = event.message.records?.[0];
-        if (record) {
-          const textDecoder = new TextDecoder(record.encoding || "utf-8");
-          const value = textDecoder.decode(record.data);
+        const textDecoder = record ? new TextDecoder(record.encoding || "utf-8") : null;
+        const value = serial || (record && textDecoder ? textDecoder.decode(record.data) : null);
+        if (value) {
           setData(value);
           setStatus("lido");
+        } else {
+          setStatus("erro de leitura");
         }
       };
 
@@ -44,5 +52,5 @@ export function useNfcReader() {
 
   useEffect(() => () => stop(), [stop]);
 
-  return { data, status, start, stop };
+  return { data, status, start, stop, clear };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Nfc } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -35,6 +35,7 @@ export function AdminIdentifiers() {
   const [error, setError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const nfc = useNfcReader();
+  const lastAutoLinkRef = useRef<string | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
@@ -76,6 +77,7 @@ export function AdminIdentifiers() {
       setSearch("");
       setIdentifierCode("");
       setTabType("prepaid");
+      nfc.clear();
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     }
   });
@@ -113,6 +115,8 @@ export function AdminIdentifiers() {
   useEffect(() => {
     if (identifierType === "nfc") {
       setIdentifierCode("");
+      setError(null);
+      lastAutoLinkRef.current = null;
       nfc.start();
     } else {
       nfc.stop();
@@ -122,6 +126,18 @@ export function AdminIdentifiers() {
   useEffect(() => {
     if (!nfc.data) return;
     setIdentifierCode(nfc.data);
+    if (identifierType !== "nfc") return;
+    if (lastAutoLinkRef.current === nfc.data) return;
+    if (mode === "existing" && !selectedCustomerId) {
+      setError("Selecione um cliente antes de aproximar o NFC.");
+      return;
+    }
+    if (mode === "new" && !name.trim()) {
+      setError("Informe o nome antes de aproximar o NFC.");
+      return;
+    }
+    lastAutoLinkRef.current = nfc.data;
+    handleSubmit().catch(() => null);
   }, [nfc.data]);
 
   useEffect(() => {
@@ -218,8 +234,20 @@ export function AdminIdentifiers() {
                   <Nfc className="relative h-5 w-5" />
                 </span>
               </div>
-              <div className="mt-3 rounded-xl border border-dashed border-emerald-200 bg-white px-3 py-3 text-sm text-slate-600">
-                {nfc.status === "lido" && identifierCode ? `NFC lido: ${identifierCode}` : "Aguardando leitura NFC..."}
+              <div
+                className={`mt-3 rounded-xl border px-3 py-3 text-sm ${
+                  nfc.status === "lido"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : nfc.status.includes("erro")
+                      ? "border-rose-200 bg-rose-50 text-rose-600"
+                      : "border-dashed border-emerald-200 bg-white text-slate-600"
+                }`}
+              >
+                {nfc.status === "lido" && identifierCode
+                  ? `Leitura OK: ${identifierCode}`
+                  : nfc.status.includes("erro")
+                    ? "Falha ao ler NFC. Tente novamente."
+                    : "Aguardando leitura NFC..."}
               </div>
             </div>
 
