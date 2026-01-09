@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/ui/button";
+import { apiFetch } from "../services/api";
 
-const pricing = [
+const fallbackPricing = [
   {
     name: "Free",
     price: "R$ 0",
@@ -110,6 +112,22 @@ const faqs = [
 
 export function MarketingLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const plansQuery = useQuery({
+    queryKey: ["public-plans"],
+    queryFn: () => apiFetch<{ plans: Array<{ id: string; name: string; description?: string | null; priceMonthly: string }> }>("/api/public/plans")
+  });
+
+  const pricing = plansQuery.data?.plans?.length
+    ? plansQuery.data.plans.map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        price: Number(plan.priceMonthly) > 0 ? `R$ ${Number(plan.priceMonthly).toFixed(2)}` : "R$ 0",
+        description: plan.description ?? "Plano ideal para crescer.",
+        features: plan.name.toLowerCase() === "free" ? ["1 filial", "1 operador", "100 clientes", "PDV basico", "5 reservas/mes"] : ["Checkout Stripe", "Suporte dedicado", "Funcionalidades completas", "Relatorios completos"],
+        cta: plan.name.toLowerCase() === "free" ? "Testar gratis" : `Assinar ${plan.name}`,
+        highlight: plan.name.toLowerCase() === "growth"
+      }))
+    : fallbackPricing;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -162,7 +180,7 @@ export function MarketingLanding() {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild className="w-full bg-orange-500 text-white hover:bg-orange-400 sm:w-auto">
-                <Link to="/login">Assinar agora</Link>
+                <Link to="/signup">Assinar agora</Link>
               </Button>
               <Button asChild variant="outline" className="w-full border-slate-300 text-slate-700 hover:bg-slate-100 sm:w-auto">
                 <a href="#planos">Ver planos</a>
@@ -319,7 +337,11 @@ export function MarketingLanding() {
                   asChild
                   className={`mt-auto ${plan.highlight ? "bg-orange-500 text-white hover:bg-orange-400" : "bg-slate-900 text-white hover:bg-slate-800"}`}
                 >
-                  <Link to="/login">{plan.cta}</Link>
+                  {"id" in plan ? (
+                    <Link to={`/signup?planId=${plan.id}`}>{plan.cta}</Link>
+                  ) : (
+                    <Link to="/signup">{plan.cta}</Link>
+                  )}
                 </Button>
               </div>
             ))}

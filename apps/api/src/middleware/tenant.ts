@@ -5,7 +5,15 @@ import { eq } from "drizzle-orm";
 
 export const tenantMiddleware = async (c: Context, next: Next) => {
   const path = c.req.path;
-  if (path.startsWith("/api/superadmin") || path.startsWith("/superadmin") || path.startsWith("/api/stripe/webhook")) {
+  if (
+    path.startsWith("/api/superadmin") ||
+    path.startsWith("/superadmin") ||
+    path.startsWith("/api/stripe/webhook") ||
+    path.startsWith("/api/auth/signup") ||
+    path.startsWith("/auth/signup") ||
+    path.startsWith("/api/public/plans") ||
+    path.startsWith("/public/plans")
+  ) {
     await next();
     return;
   }

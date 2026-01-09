@@ -5,7 +5,7 @@ import { z } from "zod";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "../db";
-import { users } from "../schema";
+import { branches, companies, companySubscriptions, plans, users } from "../schema";
 import { and, eq } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 
@@ -24,6 +24,14 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   role: z.string().default("admin")
+});
+
+const signupSchema = z.object({
+  companyName: z.string().min(2),
+  cnpj: z.string().min(10),
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6)
 });
 
 export const authRoutes = new Hono();
@@ -134,6 +142,90 @@ authRoutes.post("/register", async (c) => {
   }
 
   return c.json({ id: created.id, name: created.name, email: created.email, role: created.role }, 201);
+});
+
+authRoutes.post("/signup", async (c) => {
+  let bodyInput: Record<string, unknown>;
+  try {
+    bodyInput = await parseJsonBody(c);
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  const body = signupSchema.parse(bodyInput);
+  const existing = await db.select().from(users).where(eq(users.email, body.email));
+  if (existing.length > 0) {
+    return c.json({ error: "Usuario ja existe" }, 409);
+  }
+
+  const passwordHash = await bcrypt.hash(body.password, 10);
+
+  const result = await db.transaction(async (tx) => {
+    const [company] = await tx
+      .insert(companies)
+      .values({
+        name: body.companyName,
+        cnpj: body.cnpj,
+        plan: "Free",
+        status: "active"
+      })
+      .returning();
+
+    const [branch] = await tx
+      .insert(branches)
+      .values({
+        companyId: company.id,
+        name: "Matriz"
+      })
+      .returning();
+
+    const [user] = await tx
+      .insert(users)
+      .values({
+        companyId: company.id,
+        branchId: branch.id,
+        name: body.name,
+        email: body.email,
+        passwordHash,
+        role: "admin"
+      })
+      .returning();
+
+    const [freePlan] = await tx.select().from(plans).where(eq(plans.name, "Free"));
+    if (freePlan) {
+      await tx
+        .insert(companySubscriptions)
+        .values({
+          companyId: company.id,
+          planId: freePlan.id,
+          status: "active"
+        })
+        .onConflictDoNothing();
+    }
+
+    return { company, user };
+  });
+
+  const token = jwt.sign(
+    { sub: result.user.id, role: result.user.role, companyId: result.company.id },
+    jwtSecret,
+    { expiresIn: "1h" }
+  );
+  const refreshToken = jwt.sign(
+    { sub: result.user.id, role: result.user.role, companyId: result.company.id },
+    jwtSecret,
+    { expiresIn: "7d" }
+  );
+
+  setAuthCookies(c, token, refreshToken);
+
+  return c.json(
+    {
+      companyId: result.company.id,
+      user: { id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role }
+    },
+    201
+  );
 });
 
 authRoutes.post("/refresh", async (c) => {

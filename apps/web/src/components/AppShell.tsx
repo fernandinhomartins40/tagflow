@@ -33,7 +33,8 @@ const adminSections = [
     title: "Administracao",
     items: [
       { label: "Filiais", to: "/admin/branches" },
-      { label: "Usuarios", to: "/admin/users" }
+      { label: "Usuarios", to: "/admin/users" },
+      { label: "Assinaturas", to: "/admin/subscriptions" }
     ]
   }
 ];

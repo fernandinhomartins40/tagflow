@@ -23,6 +23,7 @@ import { tabsRoutes } from "./routes/tabs";
 import { cashRoutes } from "./routes/cash";
 import { superAdminRoutes } from "./routes/superadmin";
 import { stripeRoutes } from "./routes/stripe";
+import { billingRoutes } from "./routes/billing";
 
 const app = new Hono();
 
@@ -74,6 +75,7 @@ secure.route("/notifications", notificationsRoutes);
 secure.route("/users", usersRoutes);
 secure.route("/tabs", tabsRoutes);
 secure.route("/cash", cashRoutes);
+secure.route("/billing", billingRoutes);
 
 app.route("/api", secure);
 app.route("/", secure);

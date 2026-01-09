@@ -1,10 +1,15 @@
 import { Hono } from "hono";
 import { db } from "../db";
-import { customerIdentifiers, customers, transactions } from "../schema";
+import { customerIdentifiers, customers, plans, transactions } from "../schema";
 import { and, desc, eq } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 
 export const publicRoutes = new Hono();
+
+publicRoutes.get("/plans", async (c) => {
+  const data = await db.select().from(plans).where(eq(plans.active, true));
+  return c.json({ plans: data });
+});
 
 publicRoutes.get("/balance/:identifier", async (c) => {
   const tenantId = getTenantId(c);

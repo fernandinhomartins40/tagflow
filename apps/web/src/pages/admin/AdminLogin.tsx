@@ -113,6 +113,9 @@ export function AdminLogin() {
             {loginMutation.isPending ? "Entrando..." : "Entrar"}
           </Button>
           {loginMutation.isError ? <p className="text-sm text-rose-500 dark:text-rose-300">Falha no login</p> : null}
+          <p className="text-center text-xs text-slate-500 dark:text-orange-100/60">
+            Nao tem conta? <a className="text-orange-600 hover:text-orange-500 dark:text-orange-200 dark:hover:text-orange-100" href="/signup">Criar conta free</a>
+          </p>
           <div className="grid gap-3">
             {isAndroid ? (
               <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-700 dark:border-orange-300/30 dark:bg-orange-500/10 dark:text-orange-100/80">

@@ -14,6 +14,7 @@ import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminTabs } from "./pages/admin/AdminTabs";
 import { AdminIdentifiers } from "./pages/admin/AdminIdentifiers";
 import { AdminCash } from "./pages/admin/AdminCash";
+import { AdminSubscriptions } from "./pages/admin/AdminSubscriptions";
 import { SuperAdminShell } from "./components/SuperAdminShell";
 import { PublicBalance } from "./pages/public/PublicBalance";
 import { PublicHistory } from "./pages/public/PublicHistory";
@@ -23,6 +24,7 @@ import { useTenantStore } from "./store/tenant";
 import { getApiBaseUrl } from "./services/config";
 import { MarketingLanding } from "./pages/MarketingLanding";
 import { SuperAdminLogin } from "./pages/superadmin/SuperAdminLogin";
+import { Signup } from "./pages/public/Signup";
 
 export default function App() {
   const status = useAuthStore((state) => state.status);
@@ -67,6 +69,10 @@ export default function App() {
           path="/login"
           element={status === "authenticated" ? <Navigate to="/admin/pdv" replace /> : status === "unknown" ? <AuthLoading /> : <AdminLogin />}
         />
+        <Route
+          path="/signup"
+          element={status === "authenticated" ? <Navigate to="/admin/pdv" replace /> : status === "unknown" ? <AuthLoading /> : <Signup />}
+        />
         <Route path="/app" element={<RequireAuth status={status}><AdminDashboard /></RequireAuth>} />
         <Route path="/admin/customers" element={<RequireAuth status={status}><AdminCustomers /></RequireAuth>} />
         <Route path="/admin/pdv" element={<RequireAuth status={status}><AdminPdv /></RequireAuth>} />
@@ -80,6 +86,7 @@ export default function App() {
         <Route path="/admin/tabs" element={<RequireAuth status={status}><AdminTabs /></RequireAuth>} />
         <Route path="/admin/identifiers" element={<RequireAuth status={status}><AdminIdentifiers /></RequireAuth>} />
         <Route path="/admin/cash" element={<RequireAuth status={status}><AdminCash /></RequireAuth>} />
+        <Route path="/admin/subscriptions" element={<RequireAuth status={status}><AdminSubscriptions /></RequireAuth>} />
         <Route path="/public/balance" element={<PublicBalance />} />
         <Route path="/public/history" element={<PublicHistory />} />
       </Route>
