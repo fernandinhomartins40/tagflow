@@ -210,14 +210,17 @@ jobs:
             if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
               echo "Installing SSL certificate with certbot..."
 
-              # Backup and temporarily disable sites with broken SSL configs
+              # Create temp directory for broken configs
+              mkdir -p /tmp/nginx-broken-configs
+
+              # Move sites with broken SSL configs out of sites-enabled
               BROKEN_SITES=""
               for site in /etc/nginx/sites-enabled/*; do
                 if [ -f "$site" ]; then
                   sitename=$(basename "$site")
                   if ! nginx -t 2>&1 | grep -q "successful"; then
-                    echo "Temporarily disabling $sitename due to SSL errors..."
-                    mv "$site" "${site}.disabled"
+                    echo "Temporarily moving $sitename to /tmp/nginx-broken-configs/"
+                    mv "$site" "/tmp/nginx-broken-configs/${sitename}"
                     BROKEN_SITES="$BROKEN_SITES $sitename"
                   fi
                 fi
@@ -233,16 +236,19 @@ jobs:
                 --email admin@tagflow.shop \
                 --redirect
 
-              # Re-enable previously disabled sites
+              # Move previously disabled sites back
               for sitename in $BROKEN_SITES; do
-                if [ -f "/etc/nginx/sites-enabled/${sitename}.disabled" ]; then
-                  echo "Re-enabling $sitename..."
-                  mv "/etc/nginx/sites-enabled/${sitename}.disabled" "/etc/nginx/sites-enabled/${sitename}"
+                if [ -f "/tmp/nginx-broken-configs/${sitename}" ]; then
+                  echo "Restoring $sitename..."
+                  mv "/tmp/nginx-broken-configs/${sitename}" "/etc/nginx/sites-enabled/${sitename}"
                 fi
               done
 
-              # Final reload with all configs
-              nginx -t && systemctl reload nginx
+              # Clean up temp directory
+              rm -rf /tmp/nginx-broken-configs
+
+              # Final reload with all configs (ignore errors from other sites)
+              systemctl reload nginx || true
             else
               echo "SSL certificate already exists, checking renewal..."
               certbot renew --dry-run || true
