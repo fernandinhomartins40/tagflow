@@ -121,7 +121,7 @@ export function MarketingLanding() {
         </div>
         <nav className="mx-auto flex max-w-6xl flex-col items-stretch justify-between gap-4 px-4 py-5 md:flex-row md:items-center">
           <div className="flex w-full items-center justify-between gap-4 md:w-auto md:justify-start">
-            <img src="/logo-tagflow.png" alt="Tagflow" className="h-16 w-auto" />
+            <img src="/logo-tagflow-black.png" alt="Tagflow" className="h-16 w-auto" />
             <button
               type="button"
               aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}

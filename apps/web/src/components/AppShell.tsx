@@ -1,9 +1,11 @@
 import { Link, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
 import { getApiBaseUrl } from "../services/config";
+import { useTheme } from "../hooks/useTheme";
 
 const adminSections = [
   {
@@ -46,7 +48,13 @@ const mobileNav = [
 
 function HomeIcon({ active }: { active?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className={`h-5 w-5 ${active ? "text-orange-400" : "text-slate-500"}`} fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-5 w-5 ${active ? "text-orange-400 dark:text-orange-300" : "text-slate-500 dark:text-slate-400"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" />
     </svg>
   );
@@ -54,7 +62,13 @@ function HomeIcon({ active }: { active?: boolean }) {
 
 function UsersIcon({ active }: { active?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className={`h-5 w-5 ${active ? "text-orange-400" : "text-slate-500"}`} fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-5 w-5 ${active ? "text-orange-400 dark:text-orange-300" : "text-slate-500 dark:text-slate-400"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <path d="M16 19.5v-1.2a3.3 3.3 0 0 0-3.3-3.3H7.3A3.3 3.3 0 0 0 4 18.3v1.2" />
       <circle cx="10" cy="7.5" r="3.2" />
       <path d="M20 19.5v-1a2.7 2.7 0 0 0-2.1-2.6" />
@@ -75,7 +89,13 @@ function CashIcon({ active }: { active?: boolean }) {
 
 function CalendarIcon({ active }: { active?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className={`h-5 w-5 ${active ? "text-orange-400" : "text-slate-500"}`} fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-5 w-5 ${active ? "text-orange-400 dark:text-orange-300" : "text-slate-500 dark:text-slate-400"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <rect x="3.5" y="5.5" width="17" height="15" rx="2.5" />
       <path d="M8 3.8v3M16 3.8v3M3.5 10h17" />
     </svg>
@@ -84,7 +104,13 @@ function CalendarIcon({ active }: { active?: boolean }) {
 
 function GridIcon({ active }: { active?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className={`h-5 w-5 ${active ? "text-orange-400" : "text-slate-500"}`} fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-5 w-5 ${active ? "text-orange-400 dark:text-orange-300" : "text-slate-500 dark:text-slate-400"}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <rect x="4" y="4" width="6.5" height="6.5" rx="1.3" />
       <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.3" />
       <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.3" />
@@ -100,10 +126,12 @@ export function AppShell() {
   const tenantId = useTenantStore((state) => state.tenantId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAuthenticated = status === "authenticated";
+  const { theme, toggleTheme } = useTheme();
 
   const activePath = location.pathname;
 
   const apiBaseUrl = getApiBaseUrl();
+  const logoSrc = theme === "dark" ? "/logo-tagflow.png" : "/logo-tagflow-black.png";
 
   useEffect(() => {
     if (status !== "unknown") return;
@@ -150,14 +178,22 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
-            <img src="/logo-tagflow.png" alt="Tagflow" className="h-10 w-auto" />
-            <span className="hidden text-xs uppercase tracking-[0.3em] text-slate-400 md:inline">Painel</span>
+            <img src={logoSrc} alt="Tagflow" className="h-10 w-auto" />
+            <span className="hidden text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 md:inline">Painel</span>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="h-9 w-9 rounded-full p-0"
+              onClick={toggleTheme}
+              aria-label="Alternar tema"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             {isAuthenticated ? (
               <Button variant="outline" onClick={handleLogout}>
                 Sair
@@ -173,21 +209,23 @@ export function AppShell() {
 
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         {isAuthenticated ? (
-          <aside className="hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex md:flex-col md:gap-6">
+          <aside className="hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:flex md:flex-col md:gap-6">
             {adminSections.map((section) => (
               <div key={section.title}>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{section.title}</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{section.title}</p>
                 <div className="mt-3 space-y-2">
                   {section.items.map((item) => (
                     <Link
                       key={item.to}
                       to={item.to}
                       className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm transition ${
-                        activePath === item.to ? "bg-orange-50 text-orange-600" : "text-slate-600 hover:bg-slate-100"
+                        activePath === item.to
+                          ? "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300"
+                          : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                       }`}
                     >
                       {item.label}
-                      <span className="text-xs text-slate-400">›</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500">›</span>
                     </Link>
                   ))}
                 </div>
@@ -196,13 +234,13 @@ export function AppShell() {
           </aside>
         ) : null}
 
-        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
           <Outlet />
         </main>
       </div>
 
       {isAuthenticated ? (
-        <nav className="fixed bottom-3 left-1/2 z-30 w-[92%] -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
+        <nav className="fixed bottom-3 left-1/2 z-30 w-[92%] -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/95 px-4 py-2 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
           <div className="grid grid-cols-5 items-center gap-2">
             {mobileNav.map((item) => {
               const isActive = item.to ? activePath === item.to : false;
@@ -213,7 +251,7 @@ export function AppShell() {
                     key={item.label}
                     type="button"
                     onClick={() => setSidebarOpen(true)}
-                    className="flex flex-col items-center gap-1 text-xs text-slate-500"
+                    className="flex flex-col items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
                   >
                     <Icon active={sidebarOpen} />
                     <span>Mais</span>
@@ -223,19 +261,19 @@ export function AppShell() {
 
               if (item.primary) {
                 return (
-                  <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1 text-xs text-slate-500">
+                  <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500 shadow-lg">
                       <Icon active />
                     </span>
-                    <span className="text-slate-600">Vendas</span>
+                    <span className="text-slate-600 dark:text-slate-200">Vendas</span>
                   </Link>
                 );
               }
 
               return (
-                <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1 text-xs text-slate-500">
+                <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                   <Icon active={isActive} />
-                  <span className={isActive ? "text-orange-600" : undefined}>{item.label}</span>
+                  <span className={isActive ? "text-orange-600 dark:text-orange-300" : undefined}>{item.label}</span>
                 </Link>
               );
             })}
@@ -250,20 +288,20 @@ export function AppShell() {
             onClick={() => setSidebarOpen(false)}
           />
           <aside
-            className={`absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition ${
+            className={`absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition dark:bg-slate-900 ${
               sidebarOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >
             <div className="flex items-center justify-between">
-              <img src="/logo-tagflow.png" alt="Tagflow" className="h-8 w-auto" />
-              <button className="text-sm text-slate-500" onClick={() => setSidebarOpen(false)}>
+              <img src={logoSrc} alt="Tagflow" className="h-8 w-auto" />
+              <button className="text-sm text-slate-500 dark:text-slate-400" onClick={() => setSidebarOpen(false)}>
                 Fechar
               </button>
             </div>
             <div className="mt-6 space-y-6">
               {adminSections.map((section) => (
                 <div key={section.title}>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{section.title}</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{section.title}</p>
                   <div className="mt-3 space-y-2">
                     {section.items.map((item) => (
                       <Link
@@ -271,11 +309,13 @@ export function AppShell() {
                         to={item.to}
                         onClick={() => setSidebarOpen(false)}
                         className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm transition ${
-                          activePath === item.to ? "bg-orange-50 text-orange-600" : "text-slate-600 hover:bg-slate-100"
+                          activePath === item.to
+                            ? "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300"
+                            : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                         }`}
                       >
                         {item.label}
-                        <span className="text-xs text-slate-400">›</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">›</span>
                       </Link>
                     ))}
                   </div>
