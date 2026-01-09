@@ -156,7 +156,7 @@ jobs:
               docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/seed.sql"
             fi
 
-            cat > /etc/nginx/sites-available/tagflow.conf << 'NGINX_EOF'
+            cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
             server {
                 listen 80;
                 listen [::]:80;
@@ -204,8 +204,8 @@ jobs:
                 }
             }
             NGINX_EOF
-
-            ln -sf /etc/nginx/sites-available/tagflow.conf /etc/nginx/sites-enabled/tagflow.conf
+            rm -f /etc/nginx/sites-enabled/tagflow.conf
+            rm -f /etc/nginx/sites-enabled/default
             nginx -t && systemctl reload nginx
 
             echo "Aguardando inicialização..."
