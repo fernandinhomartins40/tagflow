@@ -209,13 +209,39 @@ jobs:
             # Install SSL certificate with certbot if not already installed
             if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
               echo "Installing SSL certificate with certbot..."
+
+              # Backup and temporarily disable sites with broken SSL configs
+              BROKEN_SITES=""
+              for site in /etc/nginx/sites-enabled/*; do
+                if [ -f "$site" ]; then
+                  sitename=$(basename "$site")
+                  if ! nginx -t 2>&1 | grep -q "successful"; then
+                    echo "Temporarily disabling $sitename due to SSL errors..."
+                    mv "$site" "${site}.disabled"
+                    BROKEN_SITES="$BROKEN_SITES $sitename"
+                  fi
+                fi
+              done
+
+              # Reload nginx without broken configs
+              nginx -t && systemctl reload nginx
+
+              # Install SSL certificate
               certbot --nginx -d tagflow.shop -d www.tagflow.shop \
                 --non-interactive \
                 --agree-tos \
                 --email admin@tagflow.shop \
                 --redirect
 
-              # Reload nginx after certbot configuration
+              # Re-enable previously disabled sites
+              for sitename in $BROKEN_SITES; do
+                if [ -f "/etc/nginx/sites-enabled/${sitename}.disabled" ]; then
+                  echo "Re-enabling $sitename..."
+                  mv "/etc/nginx/sites-enabled/${sitename}.disabled" "/etc/nginx/sites-enabled/${sitename}"
+                fi
+              done
+
+              # Final reload with all configs
               nginx -t && systemctl reload nginx
             else
               echo "SSL certificate already exists, checking renewal..."
