@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install
 COPY . .
+ARG VITE_API_URL=http://localhost:8080
+ENV VITE_API_URL=$VITE_API_URL
 RUN bun run build
 
 FROM nginx:alpine

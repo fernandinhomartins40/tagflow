@@ -1,0 +1,204 @@
+name: Deploy Tagflow to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH password file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_PASSWORD }}" > ~/.ssh/vps_password
+          chmod 600 ~/.ssh/vps_password
+
+      - name: Sync code to VPS
+        run: |
+          sudo apt-get update && sudo apt-get install -y sshpass rsync
+
+          sshpass -f ~/.ssh/vps_password ssh -o StrictHostKeyChecking=no root@72.60.10.112 "mkdir -p /root/tagflow"
+
+          sshpass -f ~/.ssh/vps_password rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.turbo' \
+            --exclude='dist' \
+            --exclude='apps/web/dist' \
+            --exclude='apps/api/dist' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='.DS_Store' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ root@72.60.10.112:/root/tagflow/
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: 72.60.10.112
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          timeout: 600s
+          command_timeout: 600s
+          script: |
+            set -e
+
+            APP_DIR="/root/tagflow"
+            cd "$APP_DIR"
+
+            EXISTING_JWT_SECRET=""
+            EXISTING_POSTGRES_PASSWORD=""
+            EXISTING_STRIPE_SECRET_KEY=""
+            EXISTING_STRIPE_WEBHOOK_SECRET=""
+            EXISTING_VAPID_PUBLIC_KEY=""
+            EXISTING_VAPID_PRIVATE_KEY=""
+            EXISTING_VAPID_SUBJECT=""
+
+            if [ -f .env ]; then
+              EXISTING_JWT_SECRET=$(grep -E '^JWT_SECRET=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_POSTGRES_PASSWORD=$(grep -E '^POSTGRES_PASSWORD=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_STRIPE_SECRET_KEY=$(grep -E '^STRIPE_SECRET_KEY=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_STRIPE_WEBHOOK_SECRET=$(grep -E '^STRIPE_WEBHOOK_SECRET=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_VAPID_PUBLIC_KEY=$(grep -E '^VAPID_PUBLIC_KEY=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_VAPID_PRIVATE_KEY=$(grep -E '^VAPID_PRIVATE_KEY=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_VAPID_SUBJECT=$(grep -E '^VAPID_SUBJECT=' .env | head -1 | cut -d '=' -f2- || true)
+            fi
+
+            JWT_SECRET="${EXISTING_JWT_SECRET:-tagflow-prod-$(date +%s)-$(openssl rand -hex 16)}"
+            POSTGRES_PASSWORD="${EXISTING_POSTGRES_PASSWORD:-tagflow_prod_change_me}"
+            STRIPE_SECRET_KEY="${EXISTING_STRIPE_SECRET_KEY:-sk_live_replace_me}"
+            STRIPE_WEBHOOK_SECRET="${EXISTING_STRIPE_WEBHOOK_SECRET:-whsec_replace_me}"
+            VAPID_PUBLIC_KEY="${EXISTING_VAPID_PUBLIC_KEY:-replace_me}"
+            VAPID_PRIVATE_KEY="${EXISTING_VAPID_PRIVATE_KEY:-replace_me}"
+            VAPID_SUBJECT="${EXISTING_VAPID_SUBJECT:-mailto:admin@tagflow.shop}"
+
+            cat > .env << EOF
+            EXTERNAL_PORT=3180
+            POSTGRES_USER=tagflow
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            POSTGRES_DB=tagflow
+            DATABASE_URL=postgresql://tagflow:${POSTGRES_PASSWORD}@db:5432/tagflow
+            JWT_SECRET=${JWT_SECRET}
+            COOKIE_SECURE=true
+            VITE_API_URL=https://tagflow.shop
+            PUBLIC_APP_URL=https://tagflow.shop
+            CORS_ORIGIN=https://tagflow.shop,https://www.tagflow.shop
+            VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+            VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+            VAPID_SUBJECT=${VAPID_SUBJECT}
+            STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+            STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+            EOF
+
+            docker-compose -f docker-compose.vps.yml down --remove-orphans || true
+            docker-compose -f docker-compose.vps.yml build --no-cache --pull
+            docker-compose -f docker-compose.vps.yml up -d --remove-orphans
+
+            DB_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q db)
+            if [ -z "$DB_CONTAINER" ]; then
+              echo "Container do banco não encontrado."
+              exit 1
+            fi
+
+            docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 \
+              -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename text primary key, applied_at timestamptz default now());"
+
+            MIGRATIONS_DIR="${APP_DIR}/apps/api/drizzle"
+            for file in $(ls -1 ${MIGRATIONS_DIR}/[0-9][0-9][0-9][0-9]_*.sql | sort); do
+              fname=$(basename "$file")
+              applied=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT 1 FROM schema_migrations WHERE filename='${fname}';" | tr -d '[:space:]')
+              if [ -z "$applied" ]; then
+                echo "Aplicando migration ${fname}..."
+                docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "$file"
+                docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 \
+                  -c "INSERT INTO schema_migrations (filename) VALUES ('${fname}');"
+              fi
+            done
+
+            SEED_COUNT=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT COUNT(*) FROM companies;" | tr -d '[:space:]' || echo "0")
+            if [ -z "$SEED_COUNT" ] || [ "$SEED_COUNT" = "0" ]; then
+              echo "Executando seed inicial..."
+              docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/seed.sql"
+            fi
+
+            cat > /etc/nginx/sites-available/tagflow.conf << 'NGINX_EOF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name tagflow.shop www.tagflow.shop;
+                return 301 https://$server_name$request_uri;
+            }
+
+            server {
+                listen 443 ssl http2;
+                listen [::]:443 ssl http2;
+                server_name tagflow.shop www.tagflow.shop;
+
+                access_log /var/log/nginx/tagflow-access.log;
+                error_log /var/log/nginx/tagflow-error.log;
+
+                client_max_body_size 50M;
+
+                location /api/ {
+                    proxy_pass http://127.0.0.1:3180/api/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+
+                location /health {
+                    proxy_pass http://127.0.0.1:3180/health;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                }
+
+                location / {
+                    proxy_pass http://127.0.0.1:3180/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host $host;
+                    proxy_cache_bypass $http_upgrade;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            NGINX_EOF
+
+            ln -sf /etc/nginx/sites-available/tagflow.conf /etc/nginx/sites-enabled/tagflow.conf
+            nginx -t && systemctl reload nginx
+
+            echo "Aguardando inicialização..."
+            sleep 15
+
+            if ! curl -f http://localhost:3180/health >/dev/null 2>&1; then
+              echo "Health check falhou."
+              docker-compose -f docker-compose.vps.yml logs --tail=200
+              exit 1
+            fi
+
+      - name: Verify Deployment
+        if: success()
+        run: |
+          echo "✅ Deploy concluído com sucesso!"
+          echo "🌐 Tagflow disponível em:"
+          echo "   - https://tagflow.shop"
+          echo "   - https://www.tagflow.shop"
+          echo "📊 Health check: https://tagflow.shop/health"
