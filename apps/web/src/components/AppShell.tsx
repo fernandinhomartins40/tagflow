@@ -234,7 +234,7 @@ export function AppShell() {
           </aside>
         ) : null}
 
-        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6 sm:pb-6">
           <Outlet />
         </main>
       </div>
