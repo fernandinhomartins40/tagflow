@@ -238,16 +238,20 @@ export function AdminIdentifiers() {
                 className={`mt-3 rounded-xl border px-3 py-3 text-sm ${
                   nfc.status === "lido"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : nfc.status.includes("erro")
-                      ? "border-rose-200 bg-rose-50 text-rose-600"
-                      : "border-dashed border-emerald-200 bg-white text-slate-600"
+                    : nfc.status === "detectado"
+                      ? "border-amber-200 bg-amber-50 text-amber-700"
+                      : nfc.status.includes("erro")
+                        ? "border-rose-200 bg-rose-50 text-rose-600"
+                        : "border-dashed border-emerald-200 bg-white text-slate-600"
                 }`}
               >
                 {nfc.status === "lido" && identifierCode
                   ? `Leitura OK: ${identifierCode}`
-                  : nfc.status.includes("erro")
-                    ? "Falha ao ler NFC. Tente novamente."
-                    : "Aguardando leitura NFC..."}
+                  : nfc.status === "detectado"
+                    ? "NFC detectado, mas o identificador nao foi lido. Tente outro cartao."
+                    : nfc.status.includes("erro")
+                      ? "Falha ao ler NFC. Tente novamente."
+                      : "Aguardando leitura NFC..."}
               </div>
             </div>
 

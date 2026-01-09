@@ -38,7 +38,8 @@ export function useNfcReader() {
           setData(value);
           setStatus("lido");
         } else {
-          setStatus("erro de leitura");
+          setData(null);
+          setStatus("detectado");
         }
       };
 
