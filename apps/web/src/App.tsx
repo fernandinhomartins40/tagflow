@@ -34,7 +34,17 @@ export default function App() {
   const isStandalone =
     typeof window !== "undefined" &&
     (window.matchMedia?.("(display-mode: standalone)").matches ||
-      (window.navigator as { standalone?: boolean }).standalone);
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone ||
+      document.referrer.startsWith("android-app://"));
+
+  useEffect(() => {
+    if (!isStandalone) return;
+    if (window.location.pathname === "/") {
+      window.location.replace("/login");
+    }
+  }, [isStandalone]);
 
   useEffect(() => {
     if (status !== "unknown") return;
