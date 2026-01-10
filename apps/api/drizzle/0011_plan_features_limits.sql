@@ -1,0 +1,4 @@
+ALTER TABLE plans
+  ADD COLUMN IF NOT EXISTS features text,
+  ADD COLUMN IF NOT EXISTS tools text,
+  ADD COLUMN IF NOT EXISTS limits text;

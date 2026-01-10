@@ -57,6 +57,7 @@ billingRoutes.post("/checkout", async (c) => {
   });
 
   const now = new Date();
+  await db.update(companies).set({ plan: plan.name }).where(eq(companies.id, user.companyId));
   if (subscription) {
     await db
       .update(companySubscriptions)
@@ -80,4 +81,49 @@ billingRoutes.post("/checkout", async (c) => {
   }
 
   return c.json({ url: session.url });
+});
+
+billingRoutes.post("/change", async (c) => {
+  const user = getUser(c);
+  const body = checkoutSchema.parse(await c.req.json());
+  const [plan] = await db.select().from(plans).where(eq(plans.id, body.planId));
+  if (!plan) {
+    return c.json({ error: "Plano nao encontrado" }, 404);
+  }
+  const price = Number(plan.priceMonthly || "0");
+  if (price > 0) {
+    return c.json({ error: "Use o checkout para planos pagos" }, 400);
+  }
+
+  const now = new Date();
+  await db.update(companies).set({ plan: plan.name }).where(eq(companies.id, user.companyId));
+
+  const [subscription] = await db
+    .select()
+    .from(companySubscriptions)
+    .where(eq(companySubscriptions.companyId, user.companyId));
+
+  if (subscription) {
+    await db
+      .update(companySubscriptions)
+      .set({
+        planId: plan.id,
+        status: "active",
+        stripeSubscriptionId: null,
+        cancelAtPeriodEnd: false,
+        updatedAt: now
+      })
+      .where(eq(companySubscriptions.id, subscription.id));
+  } else {
+    await db
+      .insert(companySubscriptions)
+      .values({
+        companyId: user.companyId,
+        planId: plan.id,
+        status: "active",
+        updatedAt: now
+      });
+  }
+
+  return c.json({ ok: true });
 });

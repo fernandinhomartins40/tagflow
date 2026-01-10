@@ -20,6 +20,9 @@ export const plans = pgTable("plans", {
   priceMonthly: numeric("price_monthly", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("brl"),
   stripePriceId: text("stripe_price_id"),
+  features: text("features"),
+  tools: text("tools"),
+  limits: text("limits"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });

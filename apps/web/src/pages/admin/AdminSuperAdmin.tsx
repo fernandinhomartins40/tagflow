@@ -21,6 +21,9 @@ interface CompanyPlan {
   priceMonthly: string;
   currency: string;
   stripePriceId?: string | null;
+  features?: string | null;
+  tools?: string | null;
+  limits?: string | null;
 }
 
 interface Company {
@@ -65,6 +68,9 @@ interface Plan {
   priceMonthly: string;
   currency: string;
   stripePriceId?: string | null;
+  features?: string | null;
+  tools?: string | null;
+  limits?: string | null;
   active: boolean;
   createdAt: string;
 }
@@ -107,6 +113,9 @@ const emptyPlanForm = {
   priceMonthly: "0.00",
   currency: "brl",
   stripePriceId: "",
+  features: "",
+  tools: "",
+  limits: "",
   active: true
 };
 
@@ -343,6 +352,9 @@ export function AdminSuperAdmin() {
       priceMonthly: plan.priceMonthly ?? "0.00",
       currency: plan.currency ?? "brl",
       stripePriceId: plan.stripePriceId ?? "",
+      features: formatPlanList(plan.features),
+      tools: formatPlanList(plan.tools),
+      limits: formatPlanList(plan.limits),
       active: plan.active ?? true
     });
     setPlanError(null);
@@ -456,6 +468,9 @@ export function AdminSuperAdmin() {
       priceMonthly: planForm.priceMonthly.trim(),
       currency: planForm.currency.trim() || "brl",
       stripePriceId: planForm.stripePriceId.trim(),
+      features: serializePlanList(planForm.features),
+      tools: serializePlanList(planForm.tools),
+      limits: serializePlanList(planForm.limits),
       active: planForm.active
     };
     if (editingPlan) {
@@ -796,6 +811,7 @@ export function AdminSuperAdmin() {
                 <tr>
                   <th className="py-2 text-left">Plano</th>
                   <th className="py-2 text-left">Valor</th>
+                  <th className="py-2 text-left">Limites</th>
                   <th className="py-2 text-left">Stripe Price</th>
                   <th className="py-2 text-left">Status</th>
                   <th className="py-2 text-left">Acoes</th>
@@ -806,6 +822,9 @@ export function AdminSuperAdmin() {
                   <tr key={plan.id} className="border-t border-slate-200">
                     <td className="py-2 font-medium">{plan.name}</td>
                     <td className="py-2">R$ {Number(plan.priceMonthly).toFixed(2)}</td>
+                    <td className="py-2 text-xs text-slate-500">
+                      {formatPlanList(plan.limits) ? formatPlanList(plan.limits) : "-"}
+                    </td>
                     <td className="py-2">{plan.stripePriceId ?? "-"}</td>
                     <td className="py-2">
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${plan.active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"}`}>
@@ -976,6 +995,24 @@ export function AdminSuperAdmin() {
               placeholder="Valor mensal"
               className="w-full rounded-xl border border-slate-200 px-3 py-2"
             />
+            <textarea
+              value={planForm.features}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, features: event.target.value }))}
+              placeholder="Ferramentas (uma por linha)"
+              className="min-h-[120px] w-full rounded-xl border border-slate-200 px-3 py-2 sm:col-span-2"
+            />
+            <textarea
+              value={planForm.limits}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, limits: event.target.value }))}
+              placeholder="Limites (uma por linha)"
+              className="min-h-[120px] w-full rounded-xl border border-slate-200 px-3 py-2 sm:col-span-2"
+            />
+            <textarea
+              value={planForm.tools}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, tools: event.target.value }))}
+              placeholder="Ferramentas extras (uma por linha)"
+              className="min-h-[120px] w-full rounded-xl border border-slate-200 px-3 py-2 sm:col-span-2"
+            />
             <input
               value={planForm.currency}
               onChange={(event) => setPlanForm((prev) => ({ ...prev, currency: event.target.value }))}
@@ -1069,6 +1106,35 @@ export function AdminSuperAdmin() {
       ) : null}
     </section>
   );
+}
+
+function parsePlanList(value?: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item)).filter(Boolean);
+    }
+  } catch {
+    // ignore
+  }
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function serializePlanList(value: string) {
+  const items = value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length ? JSON.stringify(items) : "";
+}
+
+function formatPlanList(value?: string | null) {
+  const list = parsePlanList(value);
+  return list.length ? list.join(", ") : "";
 }
 
 function CompanyModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {

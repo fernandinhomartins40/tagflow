@@ -114,7 +114,18 @@ export function MarketingLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const plansQuery = useQuery({
     queryKey: ["public-plans"],
-    queryFn: () => apiFetch<{ plans: Array<{ id: string; name: string; description?: string | null; priceMonthly: string }> }>("/api/public/plans")
+    queryFn: () =>
+      apiFetch<{
+        plans: Array<{
+          id: string;
+          name: string;
+          description?: string | null;
+          priceMonthly: string;
+          features?: string | null;
+          tools?: string | null;
+          limits?: string | null;
+        }>;
+      }>("/api/public/plans")
   });
 
   const pricing = plansQuery.data?.plans?.length
@@ -123,7 +134,7 @@ export function MarketingLanding() {
         name: plan.name,
         price: Number(plan.priceMonthly) > 0 ? `R$ ${Number(plan.priceMonthly).toFixed(2)}` : "R$ 0",
         description: plan.description ?? "Plano ideal para crescer.",
-        features: plan.name.toLowerCase() === "free" ? ["1 filial", "1 operador", "100 clientes", "PDV basico", "5 reservas/mes"] : ["Checkout Stripe", "Suporte dedicado", "Funcionalidades completas", "Relatorios completos"],
+        features: buildPlanFeatures(plan),
         cta: plan.name.toLowerCase() === "free" ? "Testar gratis" : `Assinar ${plan.name}`,
         highlight: plan.name.toLowerCase() === "growth"
       }))
@@ -370,4 +381,25 @@ export function MarketingLanding() {
       </section>
     </div>
   );
+}
+
+function parsePlanList(value?: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item)).filter(Boolean);
+    }
+  } catch {
+    // ignore
+  }
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function buildPlanFeatures(plan: { features?: string | null; tools?: string | null; limits?: string | null }) {
+  const features = [...parsePlanList(plan.features), ...parsePlanList(plan.tools), ...parsePlanList(plan.limits)];
+  return features.length ? features.slice(0, 6) : ["Checkout Stripe", "Suporte dedicado", "Funcionalidades completas", "Relatorios completos"];
 }

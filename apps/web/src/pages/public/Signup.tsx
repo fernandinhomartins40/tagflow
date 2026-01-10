@@ -12,6 +12,9 @@ interface Plan {
   description?: string | null;
   priceMonthly: string;
   stripePriceId?: string | null;
+  features?: string | null;
+  tools?: string | null;
+  limits?: string | null;
 }
 
 interface SignupResponse {
@@ -168,6 +171,16 @@ export function Signup() {
                       <span>{price > 0 ? `R$ ${price.toFixed(2)}` : "R$ 0"}</span>
                     </div>
                     <p className="text-xs text-slate-500">{plan.description ?? "Plano flexivel."}</p>
+                    {buildPlanFeatures(plan).length ? (
+                      <ul className="mt-2 space-y-1 text-xs text-slate-500">
+                        {buildPlanFeatures(plan).map((item) => (
+                          <li key={item} className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-orange-300" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {price > 0 && !plan.stripePriceId ? (
                       <p className="text-xs text-amber-600">Checkout indisponivel no momento.</p>
                     ) : null}
@@ -183,4 +196,25 @@ export function Signup() {
       </div>
     </section>
   );
+}
+
+function parsePlanList(value?: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item)).filter(Boolean);
+    }
+  } catch {
+    // ignore
+  }
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function buildPlanFeatures(plan: { features?: string | null; tools?: string | null; limits?: string | null }) {
+  const features = [...parsePlanList(plan.features), ...parsePlanList(plan.tools), ...parsePlanList(plan.limits)];
+  return features.length ? features.slice(0, 4) : [];
 }

@@ -22,10 +22,42 @@ const run = async () => {
   await db
     .insert(plans)
     .values([
-      { name: "Free", description: "Entrada com limite basico.", priceMonthly: "0.00", currency: "brl", active: true },
-      { name: "Start", description: "Operacao inicial completa.", priceMonthly: "199.00", currency: "brl", active: true },
-      { name: "Growth", description: "Escala e recursos avancados.", priceMonthly: "399.00", currency: "brl", active: true },
-      { name: "Enterprise", description: "Plano sob medida.", priceMonthly: "0.00", currency: "brl", active: true }
+      {
+        name: "Free",
+        description: "Entrada com limite basico.",
+        priceMonthly: "0.00",
+        currency: "brl",
+        features: JSON.stringify(["PDV basico", "Reservas essenciais", "Relatorios simples"]),
+        limits: JSON.stringify(["1 filial", "1 operador", "100 clientes", "5 reservas/mes"]),
+        active: true
+      },
+      {
+        name: "Start",
+        description: "Operacao inicial completa.",
+        priceMonthly: "199.00",
+        currency: "brl",
+        features: JSON.stringify(["PDV completo", "NFC e codigo de barras", "Relatorios padrao"]),
+        limits: JSON.stringify(["2 filiais", "5 operadores", "2.000 clientes"]),
+        active: true
+      },
+      {
+        name: "Growth",
+        description: "Escala e recursos avancados.",
+        priceMonthly: "399.00",
+        currency: "brl",
+        features: JSON.stringify(["Divisao de contas", "Indicadores ao vivo", "Equipe dedicada"]),
+        limits: JSON.stringify(["5 filiais", "15 operadores", "10.000 clientes"]),
+        active: true
+      },
+      {
+        name: "Enterprise",
+        description: "Plano sob medida.",
+        priceMonthly: "0.00",
+        currency: "brl",
+        features: JSON.stringify(["Ambiente isolado", "SLA e auditoria", "Customizacoes"]),
+        limits: JSON.stringify(["Filiais ilimitadas", "Usuarios ilimitados"]),
+        active: true
+      }
     ])
     .onConflictDoNothing();
 

@@ -40,6 +40,9 @@ const planSchema = z.object({
   priceMonthly: z.string().min(1),
   currency: z.string().min(2).default("brl"),
   stripePriceId: z.string().optional().nullable(),
+  features: z.string().optional().nullable(),
+  tools: z.string().optional().nullable(),
+  limits: z.string().optional().nullable(),
   active: z.boolean().optional()
 });
 
