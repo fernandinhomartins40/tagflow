@@ -157,19 +157,7 @@ jobs:
             fi
 
             # Create initial HTTP-only nginx config
-            NGINX_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q nginx || true)
-            UPSTREAM_IP=""
-            if [ -n "$NGINX_CONTAINER" ]; then
-              UPSTREAM_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$NGINX_CONTAINER" 2>/dev/null || echo "")
-            fi
-            if [ -z "$UPSTREAM_IP" ]; then
-              UPSTREAM_IP="127.0.0.1"
-              UPSTREAM_PORT="3180"
-            else
-              UPSTREAM_PORT="80"
-            fi
-
-            cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
+            cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
             server {
                 listen 80;
                 listen [::]:80;
@@ -181,7 +169,7 @@ jobs:
                 client_max_body_size 50M;
 
                 location /api/ {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
+                    proxy_pass http://127.0.0.1:3180/api/;
                     proxy_http_version 1.1;
                     proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
@@ -192,13 +180,13 @@ jobs:
                 }
 
                 location /health {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
+                    proxy_pass http://127.0.0.1:3180/health;
                     proxy_http_version 1.1;
                     proxy_set_header Host $host;
                 }
 
                 location / {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
+                    proxy_pass http://127.0.0.1:3180/;
                     proxy_http_version 1.1;
                     proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
@@ -235,12 +223,12 @@ jobs:
                 --post-hook "systemctl start nginx"
 
               # Update nginx config with SSL
-              cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
+              cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
             server {
                 listen 80;
                 listen [::]:80;
                 server_name tagflow.shop www.tagflow.shop;
-                return 301 https://\$host\$request_uri;
+                return 301 https://$host$request_uri;
             }
 
             server {
@@ -257,32 +245,32 @@ jobs:
                 client_max_body_size 50M;
 
                 location /api/ {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
+                    proxy_pass http://127.0.0.1:3180/api/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
                 }
 
                 location /health {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
+                    proxy_pass http://127.0.0.1:3180/health;
                     proxy_http_version 1.1;
-                    proxy_set_header Host \$host;
+                    proxy_set_header Host $host;
                 }
 
                 location / {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
+                    proxy_pass http://127.0.0.1:3180/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_cache_bypass \$http_upgrade;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_set_header Host $host;
+                    proxy_cache_bypass $http_upgrade;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
                 }
             }
             NGINX_EOF
