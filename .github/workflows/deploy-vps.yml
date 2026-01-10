@@ -215,16 +215,28 @@ jobs:
 
               # Stop nginx to free port 80 for certbot
               systemctl stop nginx
+              sleep 2
+
+              # Verify port 80 is free
+              if netstat -tlnp | grep ':80 '; then
+                echo "❌ Port 80 is still in use!"
+                netstat -tlnp | grep ':80 '
+                systemctl start nginx
+                exit 1
+              fi
 
               # Use certbot standalone mode to avoid nginx conflicts
+              echo "Running certbot for tagflow.shop and www.tagflow.shop..."
               if certbot certonly --standalone --preferred-challenges http \
                 -d tagflow.shop -d www.tagflow.shop \
                 --non-interactive \
                 --agree-tos \
-                --email admin@tagflow.shop; then
+                --email admin@tagflow.shop \
+                --cert-name tagflow.shop; then
                 echo "✅ SSL certificate installed successfully"
               else
                 echo "❌ Failed to install SSL certificate"
+                cat /var/log/letsencrypt/letsencrypt.log | tail -50
                 systemctl start nginx
                 exit 1
               fi
@@ -232,7 +244,17 @@ jobs:
               # Verify certificate was created
               if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
                 echo "❌ Certificate file not found after certbot"
+                ls -la /etc/letsencrypt/live/ || true
                 systemctl start nginx
+                exit 1
+              fi
+
+              # Verify certificate is for correct domain
+              if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
+                echo "✅ Certificate verified for tagflow.shop"
+              else
+                echo "❌ Certificate is not for tagflow.shop"
+                openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep "DNS:"
                 exit 1
               fi
 
@@ -252,6 +274,9 @@ jobs:
 
                 ssl_certificate /etc/letsencrypt/live/tagflow.shop/fullchain.pem;
                 ssl_certificate_key /etc/letsencrypt/live/tagflow.shop/privkey.pem;
+                ssl_protocols TLSv1.2 TLSv1.3;
+                ssl_ciphers HIGH:!aNULL:!MD5;
+                ssl_prefer_server_ciphers on;
 
                 access_log /var/log/nginx/tagflow-access.log;
                 error_log /var/log/nginx/tagflow-error.log;
@@ -289,13 +314,30 @@ jobs:
             }
             NGINX_EOF
 
+              # Test nginx config before starting
+              if ! nginx -t; then
+                echo "❌ Nginx config test failed"
+                exit 1
+              fi
+
               # Start nginx with new SSL config
               systemctl start nginx
+              sleep 2
 
               # Verify nginx started successfully
               if ! systemctl is-active --quiet nginx; then
                 echo "❌ Nginx failed to start with SSL config"
-                nginx -t
+                systemctl status nginx
+                journalctl -u nginx -n 50
+                exit 1
+              fi
+
+              # Verify SSL is working
+              echo "Testing SSL certificate..."
+              if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
+                echo "✅ HTTPS is responding"
+              else
+                echo "❌ HTTPS is not responding"
                 exit 1
               fi
 
