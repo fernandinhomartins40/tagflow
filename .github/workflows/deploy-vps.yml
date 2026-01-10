@@ -209,8 +209,22 @@ jobs:
             fi
             systemctl reload nginx || echo "Warning: nginx reload had issues"
 
-            # Install SSL certificate with certbot if not already installed
-            if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
+            # Check if SSL certificate exists and is valid
+            CERT_EXISTS=false
+            if [ -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
+              if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
+                echo "✅ Valid SSL certificate found for tagflow.shop"
+                CERT_EXISTS=true
+              else
+                echo "⚠️  Certificate exists but is not for tagflow.shop, removing..."
+                rm -rf /etc/letsencrypt/live/tagflow.shop
+                rm -rf /etc/letsencrypt/archive/tagflow.shop
+                rm -f /etc/letsencrypt/renewal/tagflow.shop.conf
+              fi
+            fi
+
+            # Install SSL certificate if not exists or invalid
+            if [ "$CERT_EXISTS" = "false" ]; then
               echo "Installing SSL certificate with certbot..."
 
               # Stop nginx to free port 80 for certbot
@@ -248,18 +262,11 @@ jobs:
                 systemctl start nginx
                 exit 1
               fi
+            fi
 
-              # Verify certificate is for correct domain
-              if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
-                echo "✅ Certificate verified for tagflow.shop"
-              else
-                echo "❌ Certificate is not for tagflow.shop"
-                openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep "DNS:"
-                exit 1
-              fi
-
-              # Update nginx config with SSL
-              cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
+            # Always update nginx config with SSL (whether cert was just installed or already existed)
+            echo "Configuring nginx with SSL..."
+            cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
             server {
                 listen 80;
                 listen [::]:80;
@@ -342,10 +349,6 @@ jobs:
               fi
 
               echo "✅ Nginx restarted with SSL configuration"
-            else
-              echo "SSL certificate already exists, checking renewal..."
-              certbot renew --dry-run || true
-            fi
 
             echo "Aguardando inicialização..."
             sleep 15
