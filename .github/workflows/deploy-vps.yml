@@ -213,14 +213,28 @@ jobs:
             if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
               echo "Installing SSL certificate with certbot..."
 
+              # Stop nginx to free port 80 for certbot
+              systemctl stop nginx
+
               # Use certbot standalone mode to avoid nginx conflicts
-              certbot certonly --standalone --preferred-challenges http \
+              if certbot certonly --standalone --preferred-challenges http \
                 -d tagflow.shop -d www.tagflow.shop \
                 --non-interactive \
                 --agree-tos \
-                --email admin@tagflow.shop \
-                --pre-hook "systemctl stop nginx" \
-                --post-hook "systemctl start nginx"
+                --email admin@tagflow.shop; then
+                echo "✅ SSL certificate installed successfully"
+              else
+                echo "❌ Failed to install SSL certificate"
+                systemctl start nginx
+                exit 1
+              fi
+
+              # Verify certificate was created
+              if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
+                echo "❌ Certificate file not found after certbot"
+                systemctl start nginx
+                exit 1
+              fi
 
               # Update nginx config with SSL
               cat > /etc/nginx/conf.d/tagflow.conf << 'NGINX_EOF'
@@ -275,7 +289,17 @@ jobs:
             }
             NGINX_EOF
 
-              systemctl reload nginx || true
+              # Start nginx with new SSL config
+              systemctl start nginx
+
+              # Verify nginx started successfully
+              if ! systemctl is-active --quiet nginx; then
+                echo "❌ Nginx failed to start with SSL config"
+                nginx -t
+                exit 1
+              fi
+
+              echo "✅ Nginx restarted with SSL configuration"
             else
               echo "SSL certificate already exists, checking renewal..."
               certbot renew --dry-run || true
