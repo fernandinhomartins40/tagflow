@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
@@ -26,6 +27,22 @@ export function AdminSubscriptions() {
     queryFn: () => apiFetch<BillingResponse>("/api/billing/plans")
   });
 
+  const plans = plansQuery.data?.plans ?? [];
+  const currentPlanId = plansQuery.data?.subscription?.planId ?? null;
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+
+  const selectedPlan = useMemo(() => {
+    if (!plans.length) return null;
+    if (selectedPlanId) {
+      return plans.find((plan) => plan.id === selectedPlanId) ?? null;
+    }
+    if (currentPlanId) {
+      return plans.find((plan) => plan.id === currentPlanId) ?? null;
+    }
+    const fallback = plans.find((plan) => plan.name.toLowerCase() === "free");
+    return fallback ?? plans[0] ?? null;
+  }, [plans, selectedPlanId, currentPlanId]);
+
   const checkoutMutation = useMutation({
     mutationFn: async (planId: string) => {
       return apiFetch<{ url: string }>("/api/billing/checkout", {
@@ -52,7 +69,6 @@ export function AdminSubscriptions() {
   });
 
   const companyPlan = plansQuery.data?.company?.plan ?? "Free";
-  const currentPlanId = plansQuery.data?.subscription?.planId ?? null;
 
   return (
     <section className="space-y-4">
@@ -66,6 +82,44 @@ export function AdminSubscriptions() {
         <p className="text-lg font-semibold text-slate-900">{companyPlan}</p>
         {plansQuery.data?.subscription?.status ? (
           <p className="text-xs text-slate-500">Status: {plansQuery.data.subscription.status}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h3 className="text-lg font-semibold">Trocar de plano</h3>
+        <p className="text-sm text-slate-500">Selecione o plano desejado e continue no checkout.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <select
+            value={selectedPlan?.id ?? ""}
+            onChange={(event) => setSelectedPlanId(event.target.value)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2"
+          >
+            {(plansQuery.data?.plans ?? []).map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name} {Number(plan.priceMonthly || "0") > 0 ? `- R$ ${Number(plan.priceMonthly).toFixed(2)}` : "- R$ 0"}
+              </option>
+            ))}
+          </select>
+          <Button
+            onClick={() => {
+              if (!selectedPlan) return;
+              const price = Number(selectedPlan.priceMonthly || "0");
+              if (price === 0) {
+                changeMutation.mutate(selectedPlan.id);
+                return;
+              }
+              if (!selectedPlan.stripePriceId) {
+                return;
+              }
+              checkoutMutation.mutate(selectedPlan.id);
+            }}
+            disabled={!selectedPlan || checkoutMutation.isPending || changeMutation.isPending || (Number(selectedPlan?.priceMonthly || "0") > 0 && !selectedPlan?.stripePriceId)}
+          >
+            {selectedPlan && Number(selectedPlan.priceMonthly || "0") === 0 ? "Trocar para Free" : "Ir para checkout"}
+          </Button>
+        </div>
+        {selectedPlan && Number(selectedPlan.priceMonthly || "0") > 0 && !selectedPlan.stripePriceId ? (
+          <p className="mt-2 text-xs text-amber-600">Checkout nao configurado para este plano.</p>
         ) : null}
       </div>
 
