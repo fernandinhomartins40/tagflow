@@ -29,6 +29,7 @@ import { Signup } from "./pages/public/Signup";
 export default function App() {
   const status = useAuthStore((state) => state.status);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const setTenantId = useTenantStore((state) => state.setTenantId);
   const tenantId = useTenantStore((state) => state.tenantId);
   const apiBaseUrl = getApiBaseUrl();
   const isStandalone =
@@ -49,14 +50,18 @@ export default function App() {
   useEffect(() => {
     if (status !== "unknown") return;
     let active = true;
+    const headers = tenantId ? { "X-Tenant-Id": tenantId } : undefined;
     fetch(`${apiBaseUrl}/api/auth/me`, {
-      headers: { "X-Tenant-Id": tenantId },
+      headers,
       credentials: "include"
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
         if (data?.user) {
+          if (data.user.companyId) {
+            setTenantId(data.user.companyId);
+          }
           setAuth("authenticated", data.user);
         } else {
           setAuth("unauthenticated");
@@ -68,7 +73,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [status, tenantId, setAuth, apiBaseUrl]);
+  }, [status, tenantId, setAuth, apiBaseUrl, setTenantId]);
 
   return (
     <Routes>

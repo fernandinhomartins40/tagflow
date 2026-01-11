@@ -5,11 +5,13 @@ const baseUrl = getApiBaseUrl();
 
 const getHeaders = () => {
   const tenantId = useTenantStore.getState().tenantId;
-
-  return {
-    "Content-Type": "application/json",
-    "X-Tenant-Id": tenantId
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
   };
+  if (tenantId) {
+    headers["X-Tenant-Id"] = tenantId;
+  }
+  return headers;
 };
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -27,9 +29,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   let res = await doFetch();
   if (res.status === 401) {
+    const refreshHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    if (useTenantStore.getState().tenantId) {
+      refreshHeaders["X-Tenant-Id"] = useTenantStore.getState().tenantId;
+    }
     const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Tenant-Id": useTenantStore.getState().tenantId },
+      headers: refreshHeaders,
       credentials: "include"
     });
     if (refreshRes.ok) {

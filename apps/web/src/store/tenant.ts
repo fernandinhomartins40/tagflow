@@ -5,7 +5,7 @@ interface TenantState {
   setTenantId: (tenantId: string) => void;
 }
 
-const defaultTenant = localStorage.getItem("tenantId") || "11111111-1111-1111-1111-111111111111";
+const defaultTenant = localStorage.getItem("tenantId") || "";
 
 export const useTenantStore = create<TenantState>((set) => ({
   tenantId: defaultTenant,

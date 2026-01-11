@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
 import { apiFetch } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
+import { useTenantStore } from "../../store/tenant";
 import { Button } from "../../components/ui/button";
 import { useTheme } from "../../hooks/useTheme";
 
@@ -13,6 +14,7 @@ interface LoginResponse {
     name: string;
     email: string;
     role: string;
+    companyId: string;
   };
 }
 
@@ -20,6 +22,7 @@ export function AdminLogin() {
   const navigate = useNavigate();
   const status = useAuthStore((state) => state.status);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const setTenantId = useTenantStore((state) => state.setTenantId);
   const [email, setEmail] = useState("admin@tagflow.local");
   const [password, setPassword] = useState("admin123");
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -42,6 +45,9 @@ export function AdminLogin() {
       });
     },
     onSuccess: (data) => {
+      if (data.user.companyId) {
+        setTenantId(data.user.companyId);
+      }
       setAuth("authenticated", data.user);
       navigate("/admin/pdv", { replace: true });
     }

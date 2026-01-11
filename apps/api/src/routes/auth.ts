@@ -87,9 +87,14 @@ authRoutes.post("/login", async (c) => {
   }
 
   if (!user) {
-    const [globalUser] = await db.select().from(users).where(eq(users.email, body.email));
-    if (globalUser?.role === "super_admin") {
-      user = globalUser;
+    const globalUsers = await db.select().from(users).where(eq(users.email, body.email));
+    if (globalUsers.length === 1) {
+      user = globalUsers[0];
+    } else {
+      const superAdmin = globalUsers.find((candidate) => candidate.role === "super_admin");
+      if (superAdmin) {
+        user = superAdmin;
+      }
     }
   }
 
@@ -111,7 +116,9 @@ authRoutes.post("/login", async (c) => {
 
   setAuthCookies(c, token, refreshToken);
 
-  return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  return c.json({
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId }
+  });
 });
 
 authRoutes.post("/register", async (c) => {
@@ -281,7 +288,9 @@ authRoutes.get("/me", async (c) => {
     if (!user.active) {
       return c.json({ error: "User inactive" }, 403);
     }
-    return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return c.json({
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId }
+    });
   } catch {
     return c.json({ error: "Invalid token" }, 401);
   }

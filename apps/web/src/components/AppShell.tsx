@@ -124,6 +124,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { status, setAuth } = useAuthStore();
+  const setTenantId = useTenantStore((state) => state.setTenantId);
   const tenantId = useTenantStore((state) => state.tenantId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAuthenticated = status === "authenticated";
@@ -137,14 +138,18 @@ export function AppShell() {
   useEffect(() => {
     if (status !== "unknown") return;
     let active = true;
+    const headers = tenantId ? { "X-Tenant-Id": tenantId } : undefined;
     fetch(`${apiBaseUrl}/api/auth/me`, {
-      headers: { "X-Tenant-Id": tenantId },
+      headers,
       credentials: "include"
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
         if (data?.user) {
+          if (data.user.companyId) {
+            setTenantId(data.user.companyId);
+          }
           setAuth("authenticated", data.user);
         } else {
           setAuth("unauthenticated");
@@ -156,7 +161,7 @@ export function AppShell() {
     return () => {
       active = false;
     };
-  }, [status, tenantId, setAuth, apiBaseUrl]);
+  }, [status, tenantId, setAuth, apiBaseUrl, setTenantId]);
 
   useEffect(() => {
     if (isAuthenticated && location.pathname === "/login") {
@@ -165,9 +170,10 @@ export function AppShell() {
   }, [isAuthenticated, location.pathname, navigate]);
 
   const handleLogout = async () => {
+    const headers = tenantId ? { "X-Tenant-Id": tenantId } : undefined;
     await fetch(`${apiBaseUrl}/api/auth/logout`, {
       method: "POST",
-      headers: { "X-Tenant-Id": tenantId },
+      headers,
       credentials: "include"
     }).catch(() => null);
     setAuth("unauthenticated");
