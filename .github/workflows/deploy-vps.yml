@@ -156,6 +156,12 @@ jobs:
               docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/seed.sql"
             fi
 
+            PLANS_COUNT=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT COUNT(*) FROM plans;" | tr -d '[:space:]' || echo "0")
+            if [ -z "$PLANS_COUNT" ] || [ "$PLANS_COUNT" = "0" ]; then
+              echo "Inserindo planos padrao..."
+              docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/seed_plans.sql"
+            fi
+
             # Resolve upstream for host nginx (docker IP preferred)
             NGINX_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q nginx || true)
             UPSTREAM_IP=""
