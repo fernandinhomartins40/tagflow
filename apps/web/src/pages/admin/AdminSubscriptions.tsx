@@ -29,7 +29,7 @@ export function AdminSubscriptions() {
 
   const plans = plansQuery.data?.plans ?? [];
   const currentPlanId = plansQuery.data?.subscription?.planId ?? null;
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [selectedPlanId] = useState<string>("");
 
   const selectedPlan = useMemo(() => {
     if (!plans.length) return null;
@@ -85,44 +85,6 @@ export function AdminSubscriptions() {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h3 className="text-lg font-semibold">Trocar de plano</h3>
-        <p className="text-sm text-slate-500">Selecione o plano desejado e continue no checkout.</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <select
-            value={selectedPlan?.id ?? ""}
-            onChange={(event) => setSelectedPlanId(event.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2"
-          >
-            {(plansQuery.data?.plans ?? []).map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.name} {Number(plan.priceMonthly || "0") > 0 ? `- R$ ${Number(plan.priceMonthly).toFixed(2)}` : "- R$ 0"}
-              </option>
-            ))}
-          </select>
-          <Button
-            onClick={() => {
-              if (!selectedPlan) return;
-              const price = Number(selectedPlan.priceMonthly || "0");
-              if (price === 0) {
-                changeMutation.mutate(selectedPlan.id);
-                return;
-              }
-              if (!selectedPlan.stripePriceId) {
-                return;
-              }
-              checkoutMutation.mutate(selectedPlan.id);
-            }}
-            disabled={!selectedPlan || checkoutMutation.isPending || changeMutation.isPending || (Number(selectedPlan?.priceMonthly || "0") > 0 && !selectedPlan?.stripePriceId)}
-          >
-            {selectedPlan && Number(selectedPlan.priceMonthly || "0") === 0 ? "Trocar para Free" : "Ir para checkout"}
-          </Button>
-        </div>
-        {selectedPlan && Number(selectedPlan.priceMonthly || "0") > 0 && !selectedPlan.stripePriceId ? (
-          <p className="mt-2 text-xs text-amber-600">Checkout nao configurado para este plano.</p>
-        ) : null}
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {(plansQuery.data?.plans ?? []).map((plan) => {
           const isCurrent = currentPlanId === plan.id || plan.name === companyPlan;
@@ -163,11 +125,14 @@ export function AdminSubscriptions() {
                 {isCurrent
                   ? "Plano atual"
                   : price === 0
-                    ? "Mudar para Free"
+                    ? "Trocar para Free"
                     : hasStripe
-                      ? "Mudar com Stripe"
+                      ? "Ir para checkout"
                       : "Indisponivel"}
               </Button>
+              {!isCurrent && price > 0 && !hasStripe ? (
+                <p className="text-xs text-amber-600">Checkout nao configurado para este plano.</p>
+              ) : null}
             </div>
           );
         })}
