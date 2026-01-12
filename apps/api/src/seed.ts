@@ -24,42 +24,79 @@ const run = async () => {
     .values([
       {
         name: "Free",
-        description: "Entrada com limite basico.",
+        description: "Comece gratuitamente com recursos essenciais.",
         priceMonthly: "0.00",
         currency: "brl",
         stripePriceId: null,
-        features: JSON.stringify(["PDV basico", "Reservas essenciais", "Relatorios simples"]),
-        limits: JSON.stringify(["1 filial", "1 operador", "100 clientes", "5 reservas/mes"]),
+        features: JSON.stringify([
+          "PDV basico",
+          "Gestao de clientes",
+          "Relatorios simples"
+        ]),
+        tools: JSON.stringify([
+          "NFC e codigo de barras",
+          "Comandas basicas",
+          "Notificacoes push"
+        ]),
+        limits: JSON.stringify([
+          "1 filial",
+          "2 usuarios",
+          "100 clientes",
+          "10 reservas/mes"
+        ]),
         active: true
       },
       {
         name: "Start",
-        description: "Operacao inicial completa.",
+        description: "Ideal para pequenas operacoes em crescimento.",
         priceMonthly: "97.00",
         currency: "brl",
         stripePriceId: "price_1SoZ0HDGSJXgT11Uw5ymYOOf",
-        features: JSON.stringify(["PDV completo", "NFC e codigo de barras", "Relatorios padrao"]),
-        limits: JSON.stringify(["2 filiais", "5 operadores", "2.000 clientes"]),
+        features: JSON.stringify([
+          "PDV completo",
+          "Gestao de estoque",
+          "Relatorios avancados",
+          "Controle de caixa"
+        ]),
+        tools: JSON.stringify([
+          "NFC e codigo de barras",
+          "Comandas multiplas",
+          "Notificacoes push",
+          "Backup automatico"
+        ]),
+        limits: JSON.stringify([
+          "2 filiais",
+          "5 usuarios",
+          "1.000 clientes",
+          "100 reservas/mes"
+        ]),
         active: true
       },
       {
-        name: "Growth",
-        description: "Escala e recursos avancados.",
+        name: "Prime",
+        description: "Recursos premium para maxima performance.",
         priceMonthly: "197.00",
         currency: "brl",
         stripePriceId: "price_1SoZ0kDGSJXgT11U1ZkZx6Mb",
-        features: JSON.stringify(["Divisao de contas", "Indicadores ao vivo", "Equipe dedicada"]),
-        limits: JSON.stringify(["5 filiais", "15 operadores", "10.000 clientes"]),
-        active: true
-      },
-      {
-        name: "Enterprise",
-        description: "Plano sob medida.",
-        priceMonthly: "0.00",
-        currency: "brl",
-        stripePriceId: null,
-        features: JSON.stringify(["Ambiente isolado", "SLA e auditoria", "Customizacoes"]),
-        limits: JSON.stringify(["Filiais ilimitadas", "Usuarios ilimitados"]),
+        features: JSON.stringify([
+          "Todos os recursos do Start",
+          "Relatorios avancados e dashboards",
+          "Divisao de contas/comandas",
+          "API e integracoes",
+          "Suporte prioritario"
+        ]),
+        tools: JSON.stringify([
+          "Analytics em tempo real",
+          "Automacao de processos",
+          "Webhooks personalizados",
+          "Exportacao de dados"
+        ]),
+        limits: JSON.stringify([
+          "5 filiais",
+          "20 usuarios",
+          "10.000 clientes",
+          "1.000 reservas/mes"
+        ]),
         active: true
       }
     ])

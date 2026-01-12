@@ -5,6 +5,7 @@ import { bookingParticipants, bookings, customers, transactions } from "../schem
 import { and, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
+import { validateBookingLimit } from "../utils/planValidation";
 
 const bookingSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
@@ -92,6 +93,11 @@ bookingsRoutes.get("/for-slot", async (c) => {
 
 bookingsRoutes.post("/", async (c) => {
   const tenantId = getTenantId(c);
+
+  // Check plan limits before creating
+  const limitCheck = await validateBookingLimit(c, tenantId);
+  if (limitCheck) return limitCheck;
+
   const body = bookingSchema.parse(await c.req.json());
 
   if (new Date(body.endAt) <= new Date(body.startAt)) {

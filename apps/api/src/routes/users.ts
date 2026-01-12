@@ -5,6 +5,7 @@ import { users } from "../schema";
 import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "../utils/tenant";
+import { validateUserLimit } from "../utils/planValidation";
 
 const userSchema = z.object({
   name: z.string().min(2),
@@ -39,6 +40,11 @@ usersRoutes.post("/", async (c) => {
     return c.json({ error: "Forbidden" }, 403);
   }
   const tenantId = getTenantId(c);
+
+  // Check plan limits before creating
+  const limitCheck = await validateUserLimit(c, tenantId);
+  if (limitCheck) return limitCheck;
+
   const body = userSchema.parse(await c.req.json());
   const passwordHash = body.password ? await bcrypt.hash(body.password, 10) : await bcrypt.hash("temp1234", 10);
 

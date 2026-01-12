@@ -5,6 +5,7 @@ import { branches } from "../schema";
 import { and, eq } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
+import { validateBranchLimit } from "../utils/planValidation";
 
 const branchSchema = z.object({
   name: z.string().min(2),
@@ -33,6 +34,11 @@ branchesRoutes.get("/", async (c) => {
 
 branchesRoutes.post("/", async (c) => {
   const tenantId = getTenantId(c);
+
+  // Check plan limits before creating
+  const limitCheck = await validateBranchLimit(c, tenantId);
+  if (limitCheck) return limitCheck;
+
   const body = branchSchema.parse(await c.req.json());
   const [created] = await db.insert(branches).values({ ...body, companyId: tenantId }).returning();
   return c.json(created, 201);

@@ -5,6 +5,7 @@ import { cashRegisters, creditPayments, customers, customerIdentifiers, transact
 import { and, eq, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
+import { validateCustomerLimit } from "../utils/planValidation";
 
 const customerSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
@@ -49,6 +50,11 @@ customersRoutes.get("/", async (c) => {
 
 customersRoutes.post("/", async (c) => {
   const tenantId = getTenantId(c);
+
+  // Check plan limits before creating
+  const limitCheck = await validateCustomerLimit(c, tenantId);
+  if (limitCheck) return limitCheck;
+
   const body = customerSchema.parse(await c.req.json());
   const [created] = await db.insert(customers).values({ ...body, companyId: tenantId }).returning();
   return c.json(created, 201);
