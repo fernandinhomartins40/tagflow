@@ -45,6 +45,9 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         with:
           host: 72.60.10.112
           username: root
@@ -52,6 +55,7 @@ jobs:
           port: 22
           timeout: 600s
           command_timeout: 600s
+          envs: STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET
           script: |
             set -e
 
@@ -78,8 +82,8 @@ jobs:
 
             JWT_SECRET="${EXISTING_JWT_SECRET:-tagflow-prod-$(date +%s)-$(openssl rand -hex 16)}"
             POSTGRES_PASSWORD="${EXISTING_POSTGRES_PASSWORD:-tagflow_prod_change_me}"
-            STRIPE_SECRET_KEY="${EXISTING_STRIPE_SECRET_KEY:-sk_live_replace_me}"
-            STRIPE_WEBHOOK_SECRET="${EXISTING_STRIPE_WEBHOOK_SECRET:-whsec_replace_me}"
+            STRIPE_SECRET_KEY="${EXISTING_STRIPE_SECRET_KEY:-${STRIPE_SECRET_KEY:-sk_live_replace_me}}"
+            STRIPE_WEBHOOK_SECRET="${EXISTING_STRIPE_WEBHOOK_SECRET:-${STRIPE_WEBHOOK_SECRET:-whsec_replace_me}}"
             VAPID_PUBLIC_KEY="${EXISTING_VAPID_PUBLIC_KEY:-replace_me}"
             VAPID_PRIVATE_KEY="${EXISTING_VAPID_PRIVATE_KEY:-replace_me}"
             VAPID_SUBJECT="${EXISTING_VAPID_SUBJECT:-mailto:admin@tagflow.shop}"
