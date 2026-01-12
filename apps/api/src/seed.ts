@@ -27,6 +27,7 @@ const run = async () => {
         description: "Entrada com limite basico.",
         priceMonthly: "0.00",
         currency: "brl",
+        stripePriceId: null,
         features: JSON.stringify(["PDV basico", "Reservas essenciais", "Relatorios simples"]),
         limits: JSON.stringify(["1 filial", "1 operador", "100 clientes", "5 reservas/mes"]),
         active: true
@@ -34,8 +35,9 @@ const run = async () => {
       {
         name: "Start",
         description: "Operacao inicial completa.",
-        priceMonthly: "199.00",
+        priceMonthly: "97.00",
         currency: "brl",
+        stripePriceId: "price_1SoZ0HDGSJXgT11Uw5ymYOOf",
         features: JSON.stringify(["PDV completo", "NFC e codigo de barras", "Relatorios padrao"]),
         limits: JSON.stringify(["2 filiais", "5 operadores", "2.000 clientes"]),
         active: true
@@ -43,8 +45,9 @@ const run = async () => {
       {
         name: "Growth",
         description: "Escala e recursos avancados.",
-        priceMonthly: "399.00",
+        priceMonthly: "197.00",
         currency: "brl",
+        stripePriceId: "price_1SoZ0kDGSJXgT11U1ZkZx6Mb",
         features: JSON.stringify(["Divisao de contas", "Indicadores ao vivo", "Equipe dedicada"]),
         limits: JSON.stringify(["5 filiais", "15 operadores", "10.000 clientes"]),
         active: true
@@ -54,6 +57,7 @@ const run = async () => {
         description: "Plano sob medida.",
         priceMonthly: "0.00",
         currency: "brl",
+        stripePriceId: null,
         features: JSON.stringify(["Ambiente isolado", "SLA e auditoria", "Customizacoes"]),
         limits: JSON.stringify(["Filiais ilimitadas", "Usuarios ilimitados"]),
         active: true
