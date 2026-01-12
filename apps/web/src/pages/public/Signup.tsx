@@ -151,46 +151,87 @@ export function Signup() {
             </p>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold">Escolha seu plano</p>
-            <div className="grid gap-2">
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-orange-50/20 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-900">Escolha seu plano</p>
+              <p className="text-xs text-slate-500">Mude quando quiser</p>
+            </div>
+            <div className="grid gap-3">
               {(plansQuery.data?.plans ?? []).map((plan) => {
                 const price = Number(plan.priceMonthly || "0");
                 const selected = (planId ?? defaultPlan?.id) === plan.id;
+                const isPrime = plan.name === "Prime";
                 return (
                   <button
                     key={plan.id}
                     type="button"
                     onClick={() => setPlanId(plan.id)}
-                    className={`rounded-xl border px-3 py-3 text-left text-sm transition ${
-                      selected ? "border-orange-300 bg-white" : "border-slate-200 bg-white/60"
+                    className={`group relative rounded-xl border-2 px-4 py-4 text-left transition-all ${
+                      selected
+                        ? isPrime
+                          ? "border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg"
+                          : "border-orange-300 bg-white shadow-md"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{plan.name}</span>
-                      <span>{price > 0 ? `R$ ${price.toFixed(2)}` : "R$ 0"}</span>
+                    {isPrime && !selected ? (
+                      <div className="absolute -top-2 right-3 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                        POPULAR
+                      </div>
+                    ) : null}
+
+                    {selected ? (
+                      <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-bold text-slate-900">{plan.name}</span>
+                          {price > 0 ? (
+                            <span className="text-xs text-slate-500">/mês</span>
+                          ) : (
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">GRÁTIS</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-600">{plan.description ?? "Plano flexível."}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-slate-900">
+                          {price > 0 ? `R$ ${price.toFixed(0)}` : "R$ 0"}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500">{plan.description ?? "Plano flexivel."}</p>
+
                     {buildPlanFeatures(plan).length ? (
-                      <ul className="mt-2 space-y-1 text-xs text-slate-500">
+                      <ul className="mt-3 space-y-1.5">
                         {buildPlanFeatures(plan).map((item) => (
-                          <li key={item} className="flex items-center gap-2">
-                            <span className="h-1.5 w-1.5 rounded-full bg-orange-300" />
-                            {item}
+                          <li key={item} className="flex items-start gap-2 text-xs text-slate-600">
+                            <svg className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="flex-1">{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : null}
+
                     {price > 0 && !plan.stripePriceId ? (
-                      <p className="text-xs text-amber-600">Checkout indisponivel no momento.</p>
+                      <p className="mt-2 text-xs text-amber-600">⚠️ Checkout indisponível no momento.</p>
                     ) : null}
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-slate-500">
-              Para planos pagos, voce sera direcionado ao checkout do Stripe apos o cadastro.
-            </p>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs text-blue-900">
+                <strong>💳 Pagamento seguro:</strong> Para planos pagos, você será direcionado ao checkout seguro do Stripe após criar sua conta.
+              </p>
+            </div>
           </div>
         </div>
       </div>
