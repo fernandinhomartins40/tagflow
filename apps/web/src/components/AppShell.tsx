@@ -199,7 +199,11 @@ export function AppShell() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4 text-slate-700 dark:text-slate-200" />
+              ) : (
+                <Moon className="h-4 w-4 text-slate-700 dark:text-slate-200" />
+              )}
             </Button>
             {isAuthenticated ? (
               <Button variant="outline" onClick={handleLogout}>
