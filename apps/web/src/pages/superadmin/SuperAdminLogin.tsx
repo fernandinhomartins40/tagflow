@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Moon, Sun } from "lucide-react";
 import { apiFetch } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { Button } from "../../components/ui/button";
+import { ThemeToggleIcon } from "../../components/ThemeToggleIcon";
 import { useTheme } from "../../hooks/useTheme";
 
 interface LoginResponse {
@@ -76,11 +76,7 @@ export function SuperAdminLogin() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? (
-                <Sun size={20} stroke="#fde68a" strokeWidth={2} />
-              ) : (
-                <Moon size={20} stroke="#f97316" strokeWidth={2} />
-              )}
+              <ThemeToggleIcon theme={theme} />
             </Button>
           </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />

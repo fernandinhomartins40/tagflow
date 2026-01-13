@@ -1,6 +1,6 @@
 import { Navigate, useNavigate } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
+import { ThemeToggleIcon } from "./ThemeToggleIcon";
 import { AdminSuperAdmin } from "../pages/admin/AdminSuperAdmin";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
@@ -53,11 +53,7 @@ export function SuperAdminShell() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? (
-                <Sun size={20} stroke="#fde68a" strokeWidth={2} />
-              ) : (
-                <Moon size={20} stroke="#f97316" strokeWidth={2} />
-              )}
+              <ThemeToggleIcon theme={theme} />
             </Button>
             <Button variant="outline" onClick={handleLogout}>
               Sair

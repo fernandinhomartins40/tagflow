@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
+import { ThemeToggleIcon } from "./ThemeToggleIcon";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
 import { getApiBaseUrl } from "../services/config";
@@ -199,11 +199,7 @@ export function AppShell() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? (
-                <Sun size={20} stroke="#fde68a" strokeWidth={2} />
-              ) : (
-                <Moon size={20} stroke="#f97316" strokeWidth={2} />
-              )}
+              <ThemeToggleIcon theme={theme} />
             </Button>
             {isAuthenticated ? (
               <Button variant="outline" onClick={handleLogout}>
