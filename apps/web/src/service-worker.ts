@@ -1,17 +1,20 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 import { clientsClaim } from "workbox-core";
-import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import { createHandlerBoundToURL, precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { NetworkFirst, CacheFirst } from "workbox-strategies";
+import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
+
+const CACHE_VERSION = "v2";
 
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
 clientsClaim();
+cleanupOutdatedCaches();
 
 const apiStrategy = new NetworkFirst({
-  cacheName: "api-cache",
+  cacheName: `api-cache-${CACHE_VERSION}`,
   networkTimeoutSeconds: 10,
   plugins: [
     new ExpirationPlugin({
@@ -37,15 +40,23 @@ registerRoute(({ url }) => url.pathname.startsWith("/api"), async (args) => {
 });
 
 registerRoute(
-  ({ request }) => request.destination === "script" || request.destination === "style" || request.destination === "image",
+  ({ request }) => request.destination === "script" || request.destination === "style",
+  new StaleWhileRevalidate({
+    cacheName: `asset-cache-${CACHE_VERSION}`,
+    plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 })]
+  })
+);
+
+registerRoute(
+  ({ request }) => request.destination === "image",
   new CacheFirst({
-    cacheName: "asset-cache",
-    plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 })]
+    cacheName: `image-cache-${CACHE_VERSION}`,
+    plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 30 * 24 * 60 * 60 })]
   })
 );
 
 const pageStrategy = new NetworkFirst({
-  cacheName: "page-cache",
+  cacheName: `page-cache-${CACHE_VERSION}`,
   networkTimeoutSeconds: 10,
   plugins: [
     new ExpirationPlugin({
@@ -66,7 +77,7 @@ registerRoute(
 
     // Fallback para index.html se houver erro
     try {
-      return await fetch("/index.html");
+      return await fetch("/index.html", { cache: "reload" });
     } catch {
       // Se até o fallback falhar, retorna resposta básica
       return new Response(
