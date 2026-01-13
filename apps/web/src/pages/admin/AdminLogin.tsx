@@ -85,15 +85,11 @@ export function AdminLogin() {
           <div className="flex justify-end">
             <Button
               variant="outline"
-              className="h-9 w-9 rounded-full p-0"
+              className="h-9 w-9 rounded-full p-0 text-slate-800 hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-slate-700 dark:text-slate-200" />
-              ) : (
-                <Moon className="h-4 w-4 text-slate-700 dark:text-slate-200" />
-              )}
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
           </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />
