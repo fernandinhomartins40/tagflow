@@ -90,9 +90,9 @@ export function AdminLogin() {
               aria-label="Alternar tema"
             >
               {theme === "dark" ? (
-                <Sun className="h-5 w-5" color="#fbbf24" strokeWidth={2.2} />
+                <Sun size={20} stroke="#fde68a" strokeWidth={2} />
               ) : (
-                <Moon className="h-5 w-5" color="#f97316" strokeWidth={2.2} />
+                <Moon size={20} stroke="#f97316" strokeWidth={2} />
               )}
             </Button>
           </div>
