@@ -76,7 +76,11 @@ export function SuperAdminLogin() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" color="#fbbf24" strokeWidth={2.2} />
+              ) : (
+                <Moon className="h-5 w-5" color="#f97316" strokeWidth={2.2} />
+              )}
             </Button>
           </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />
