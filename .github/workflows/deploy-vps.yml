@@ -143,6 +143,8 @@ jobs:
               -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename text primary key, applied_at timestamptz default now());"
 
             MIGRATIONS_DIR="${APP_DIR}/apps/api/drizzle"
+            echo "Migrations disponiveis:"
+            ls -1 "${MIGRATIONS_DIR}" || true
             for file in $(ls -1 ${MIGRATIONS_DIR}/[0-9][0-9][0-9][0-9]_*.sql 2>/dev/null | sort); do
               fname=$(basename "$file")
               applied=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT 1 FROM schema_migrations WHERE filename='${fname}';" | tr -d '[:space:]')
@@ -153,6 +155,15 @@ jobs:
                   -c "INSERT INTO schema_migrations (filename) VALUES ('${fname}');"
               fi
             done
+
+            GLOBAL_TABLE_EXISTS=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT 1 FROM information_schema.tables WHERE table_name='global_customers';" | tr -d '[:space:]')
+            GLOBAL_COLUMN_EXISTS=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT 1 FROM information_schema.columns WHERE table_name='customers' AND column_name='global_customer_id';" | tr -d '[:space:]')
+            if [ -z "$GLOBAL_TABLE_EXISTS" ] || [ -z "$GLOBAL_COLUMN_EXISTS" ]; then
+              echo "Aplicando migration global de clientes manualmente..."
+              docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/0012_global_customers.sql"
+              docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 \
+                -c "INSERT INTO schema_migrations (filename) VALUES ('0012_global_customers.sql') ON CONFLICT DO NOTHING;"
+            fi
 
             SEED_COUNT=$(docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -t -c "SELECT COUNT(*) FROM companies;" | tr -d '[:space:]' || echo "0")
             if [ -z "$SEED_COUNT" ] || [ "$SEED_COUNT" = "0" ]; then
