@@ -81,11 +81,36 @@ const priceUnits = {
 } as const;
 
 const quickActions = [
-  { key: "products", label: "Produtos", icon: Boxes, color: "bg-amber-50 text-amber-700 border-amber-200" },
-  { key: "services", label: "Servicos", icon: CupSoda, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  { key: "locations", label: "Locais", icon: MapPinned, color: "bg-sky-50 text-sky-700 border-sky-200" },
-  { key: "credit", label: "Credito pre-pago", icon: CreditCard, color: "bg-violet-50 text-violet-700 border-violet-200" },
-  { key: "link", label: "Vincular", icon: Link2, color: "bg-slate-50 text-slate-700 border-slate-200" }
+  {
+    key: "products",
+    label: "Produtos",
+    icon: Boxes,
+    color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/40"
+  },
+  {
+    key: "services",
+    label: "Servicos",
+    icon: CupSoda,
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/40"
+  },
+  {
+    key: "locations",
+    label: "Locais",
+    icon: MapPinned,
+    color: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/40"
+  },
+  {
+    key: "credit",
+    label: "Credito pre-pago",
+    icon: CreditCard,
+    color: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/40"
+  },
+  {
+    key: "link",
+    label: "Vincular",
+    icon: Link2,
+    color: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-500/20 dark:text-slate-100 dark:border-slate-400/30"
+  }
 ] as const;
 
 export function AdminPdv() {
@@ -521,7 +546,7 @@ export function AdminPdv() {
     <section className="space-y-4">
       <header>
         <h2 className="text-2xl font-semibold">PDV</h2>
-        <p className="text-sm text-slate-600">Selecione itens e vincule a comanda rapidamente.</p>
+        <p className="text-sm text-slate-600 dark:text-neutral-300">Selecione itens e vincule a comanda rapidamente.</p>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
@@ -541,7 +566,7 @@ export function AdminPdv() {
               setActiveModal(action.key);
               setError(null);
             }}
-            className={`aspect-square w-full rounded-2xl border ${action.color} p-3 text-left text-sm font-semibold shadow-sm transition hover:brightness-95`}
+            className={`aspect-square w-full rounded-2xl border ${action.color} p-3 text-left text-sm font-semibold shadow-sm transition hover:brightness-95 dark:hover:brightness-110`}
           >
             <action.icon className="h-6 w-6" />
             <span className="mt-auto">{action.label}</span>
@@ -549,17 +574,17 @@ export function AdminPdv() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-[#2a2420] dark:bg-[#1b1613]">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Itens da comanda</h3>
-          <span className="text-xs text-slate-400">{cartItems.length} item(s)</span>
+          <span className="text-xs text-slate-400 dark:text-neutral-400">{cartItems.length} item(s)</span>
         </div>
         {locationNotice ? (
           <div
             className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
               locationNotice.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-rose-200 bg-rose-50 text-rose-600"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                : "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
             }`}
           >
             {locationNotice.message}
@@ -567,13 +592,13 @@ export function AdminPdv() {
         ) : null}
         <div className="mt-3 space-y-2">
           {cartItems.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum item selecionado.</p>
+            <p className="text-sm text-slate-500 dark:text-neutral-400">Nenhum item selecionado.</p>
           ) : (
             cartItems.map((item) => (
-              <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2">
+              <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-[#2a2420]">
                 <div>
                   <p className="text-sm font-medium">{item.name}</p>
-                  <p className="text-xs text-slate-500">R$ {item.price.toFixed(2)} {item.type === "location" && item.startAt ? "- locacao" : ""}</p>
+                  <p className="text-xs text-slate-500 dark:text-neutral-400">R$ {item.price.toFixed(2)} {item.type === "location" && item.startAt ? "- locacao" : ""}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {item.type === "location" ? (
@@ -626,7 +651,7 @@ export function AdminPdv() {
             setError(null);
           }}
         >
-          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300">
             Itens adicionados neste modal:{" "}
             {cartItems.filter((item) => {
               if (activeModal === "products") return item.type === "product";
@@ -651,10 +676,10 @@ export function AdminPdv() {
                 {cartItems
                   .filter((item) => item.type === "product")
                   .map((item) => (
-                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-[#2a2420]">
                       <div>
                         <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">Qtd: {item.quantity}</p>
+                        <p className="text-xs text-slate-500 dark:text-neutral-400">Qtd: {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
@@ -684,10 +709,10 @@ export function AdminPdv() {
                 {cartItems
                   .filter((item) => item.type === "service")
                   .map((item) => (
-                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-[#2a2420]">
                       <div>
                         <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">Qtd: {item.quantity}</p>
+                        <p className="text-xs text-slate-500 dark:text-neutral-400">Qtd: {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="sm" variant="outline" onClick={() => removeItem(item.key)}>
@@ -720,10 +745,10 @@ export function AdminPdv() {
                 {cartItems
                   .filter((item) => item.type === "location")
                   .map((item) => (
-                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-[#2a2420]">
                       <div>
                         <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-neutral-400">
                           {item.startAt ? new Date(item.startAt).toLocaleString("pt-BR") : ""} -{" "}
                           {item.endAt ? new Date(item.endAt).toLocaleString("pt-BR") : ""}
                         </p>
@@ -742,8 +767,8 @@ export function AdminPdv() {
       {identifyOpen ? (
         <Modal title="Identificar cliente" onClose={() => setIdentifyOpen(false)}>
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">Prioridade: NFC. O leitor foi ativado automaticamente.</p>
-            <p className="text-xs text-slate-500">Credito pre-pago = saldo antecipado. Credito = consumo com acerto no final.</p>
+            <p className="text-sm text-slate-600 dark:text-neutral-300">Prioridade: NFC. O leitor foi ativado automaticamente.</p>
+            <p className="text-xs text-slate-500 dark:text-neutral-400">Credito pre-pago = saldo antecipado. Credito = consumo com acerto no final.</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <Button variant={identifyMethod === "nfc" ? "default" : "outline"} onClick={() => setIdentifyMethod("nfc")}>NFC</Button>
               <Button variant={identifyMethod === "qr" ? "default" : "outline"} onClick={() => { setIdentifyMethod("qr"); setScanType("qr"); setScanOpen(true); }}>QR Code</Button>
@@ -790,16 +815,16 @@ export function AdminPdv() {
 
             {identifyMethod === "nfc" ? (
               <div
-                className={`rounded-xl border p-3 text-sm ${
-                  nfc.status === "lido"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : nfc.status === "detectado"
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : nfc.status.includes("erro")
-                        ? "border-rose-200 bg-rose-50 text-rose-600"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
-                }`}
-              >
+              className={`rounded-xl border p-3 text-sm ${
+                nfc.status === "lido"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                  : nfc.status === "detectado"
+                    ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200"
+                    : nfc.status.includes("erro")
+                      ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
+                      : "border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300"
+              }`}
+            >
                 {nfc.status === "lido" && nfc.data
                   ? `Leitura OK: ${nfc.data}`
                   : nfc.status === "detectado"
@@ -887,31 +912,31 @@ export function AdminPdv() {
       {locationModalOpen && locationTarget ? (
         <Modal title={`Adicionar ${locationTarget.name}`} onClose={() => setLocationModalOpen(false)}>
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300">
               Valor base: R$ {Number(locationTarget.price).toFixed(2)} / {priceUnits[locationTarget.priceUnit]}
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300">
               Quantidade calculada: {resolveLocationCharge(locationTarget).quantity}
             </div>
             {locationNotice ? (
               <div
                 className={`rounded-xl border px-3 py-2 text-sm ${
                   locationNotice.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-rose-200 bg-rose-50 text-rose-600"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                    : "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
                 }`}
               >
                 {locationNotice.message}
               </div>
             ) : null}
             {error ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200">
                 {error}
               </div>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Inicio</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-neutral-400">Inicio</label>
                 <input
                   type="datetime-local"
                   value={locationStart}
@@ -920,7 +945,7 @@ export function AdminPdv() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Fim</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-neutral-400">Fim</label>
                 <input
                   type="datetime-local"
                   value={locationEnd}
@@ -937,7 +962,7 @@ export function AdminPdv() {
                 </div>
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Total</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-neutral-400">Total</label>
                 <input
                   value={locationTotal}
                   onChange={(event) => setLocationTotal(formatCurrencyInput(event.target.value))}
@@ -947,12 +972,12 @@ export function AdminPdv() {
               </div>
             </div>
             {locationConflict ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
                 Local reservado. Cliente: {locationConflict.customerName ?? "Nao informado"}.
               </div>
             ) : null}
             {locationConflict ? (
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-neutral-300">
                 <input type="checkbox" checked={confirmReserved} onChange={(event) => setConfirmReserved(event.target.checked)} />
                 Confirmar atendimento da reserva
               </label>
@@ -1025,12 +1050,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     >
       <div
         data-modal-panel="true"
-        className="mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-lg sm:p-6"
+        className="mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white p-4 shadow-lg dark:bg-[#120f0d] sm:p-6"
         style={{ maxHeight: "calc(100vh - 3rem)" }}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{title}</h3>
-          <button className="text-sm text-slate-500" onClick={onClose}>
+          <button className="text-sm text-slate-500 dark:text-neutral-400" onClick={onClose}>
             Fechar
           </button>
         </div>
@@ -1043,14 +1068,14 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function ItemCard({ title, imageUrl, price, onAdd, onRemove }: { title: string; imageUrl?: string; price: number; onAdd: () => void; onRemove: () => void }) {
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+    <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613]">
       <div className="space-y-2">
-        <div className="h-16 w-full rounded-xl bg-slate-100">
+        <div className="h-16 w-full rounded-xl bg-slate-100 dark:bg-[#241e1a]">
           {imageUrl ? <img src={imageUrl} alt={title} className="h-full w-full rounded-xl object-cover" /> : null}
         </div>
         <div>
           <p className="text-xs font-semibold">{title}</p>
-          <p className="text-[11px] text-slate-500">R$ {price.toFixed(2)}</p>
+          <p className="text-[11px] text-slate-500 dark:text-neutral-400">R$ {price.toFixed(2)}</p>
         </div>
       </div>
       <div className="mt-2 flex items-center gap-1">

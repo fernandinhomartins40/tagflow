@@ -38,7 +38,7 @@ export function ScannerModal({ open, onClose, onScan, mode }: ScannerModalProps)
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 dark:bg-[#120f0d] dark:text-neutral-100">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{mode === "qr" ? "Scanner de QR Code" : "Scanner de codigo de barras"}</h3>
           <Button size="sm" variant="outline" onClick={onClose}>
@@ -46,7 +46,7 @@ export function ScannerModal({ open, onClose, onScan, mode }: ScannerModalProps)
           </Button>
         </div>
         {mode === "qr" ? (
-          <div className="relative mt-4 overflow-hidden rounded-xl bg-slate-100">
+          <div className="relative mt-4 overflow-hidden rounded-xl bg-slate-100 dark:bg-[#1b1613]">
             <div id={containerId} className="min-h-[260px]" />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative h-48 w-48">
@@ -59,7 +59,7 @@ export function ScannerModal({ open, onClose, onScan, mode }: ScannerModalProps)
             </div>
           </div>
         ) : (
-          <div className="relative mt-4 overflow-hidden rounded-xl bg-slate-100">
+          <div className="relative mt-4 overflow-hidden rounded-xl bg-slate-100 dark:bg-[#1b1613]">
             <video id={containerId} className="w-full" />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative h-24 w-64 max-w-[80%] rounded-2xl border-2 border-emerald-500/70">
@@ -68,7 +68,7 @@ export function ScannerModal({ open, onClose, onScan, mode }: ScannerModalProps)
             </div>
           </div>
         )}
-        <p className="mt-2 text-xs text-slate-500">Status: {status}</p>
+        <p className="mt-2 text-xs text-slate-500 dark:text-neutral-400">Status: {status}</p>
       </div>
     </div>
   );

@@ -20,14 +20,14 @@ export function AddCreditModal({ open, onClose, onConfirm }: AddCreditModalProps
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-brand-100 bg-white p-5 shadow-lg">
+      <div className="w-full max-w-sm rounded-2xl border border-brand-100 bg-white p-5 shadow-lg dark:border-[#2a2420] dark:bg-[#120f0d] dark:text-neutral-100">
         <h3 className="text-lg font-semibold">Adicionar credito pre-pago</h3>
         <div className="mt-3 space-y-3">
           <input
             value={amount}
             onChange={(event) => setAmount(formatCurrencyInput(event.target.value))}
             placeholder="Valor"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            className="w-full rounded-xl border border-brand-100 px-3 py-2 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-100"
           />
           <div className="grid grid-cols-2 gap-2">
             {[
@@ -44,7 +44,9 @@ export function AddCreditModal({ open, onClose, onConfirm }: AddCreditModalProps
                   type="button"
                   onClick={() => setMethod(option.value as PaymentMethod)}
                   className={`flex aspect-square flex-col items-center justify-center rounded-2xl border px-2 text-xs font-semibold transition ${
-                    active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-brand-100 bg-white text-slate-600"
+                    active
+                      ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400/60 dark:bg-brand-500/20 dark:text-brand-200"
+                      : "border-brand-100 bg-white text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
