@@ -1,0 +1,17 @@
+{
+  "name": "Tagflow Cliente",
+  "short_name": "Cliente",
+  "description": "Painel do cliente Tagflow",
+  "start_url": "/cliente/login",
+  "scope": "/cliente/",
+  "display": "standalone",
+  "background_color": "#0b0b0b",
+  "theme_color": "#0b0b0b",
+  "icons": [
+    {
+      "src": "/icons/customer-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

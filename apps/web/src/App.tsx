@@ -1,4 +1,4 @@
-import { Route, Routes, Navigate } from "react-router-dom";
+import { Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminCustomers } from "./pages/admin/AdminCustomers";
@@ -35,6 +35,7 @@ export default function App() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const setTenantId = useTenantStore((state) => state.setTenantId);
   const tenantId = useTenantStore((state) => state.tenantId);
+  const location = useLocation();
   const apiBaseUrl = getApiBaseUrl();
   const isStandalone =
     typeof window !== "undefined" &&
@@ -50,6 +51,25 @@ export default function App() {
       window.location.replace("/login");
     }
   }, [isStandalone]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const isCustomer = location.pathname.startsWith("/cliente");
+    const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (isCustomer) {
+      if (manifest) manifest.href = "/customer.webmanifest";
+      if (appleIcon) appleIcon.href = "/icons/customer-icon.svg";
+      if (themeMeta) themeMeta.content = "#0b0b0b";
+      document.title = "Tagflow Cliente";
+    } else {
+      if (manifest) manifest.href = "/manifest.webmanifest";
+      if (appleIcon) appleIcon.href = "/icons/icon.svg";
+      if (themeMeta) themeMeta.content = "#ff7b47";
+      document.title = "Tagflow";
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (status !== "unknown") return;
