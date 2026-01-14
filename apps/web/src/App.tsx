@@ -15,6 +15,7 @@ import { AdminTabs } from "./pages/admin/AdminTabs";
 import { AdminIdentifiers } from "./pages/admin/AdminIdentifiers";
 import { AdminCash } from "./pages/admin/AdminCash";
 import { AdminSubscriptions } from "./pages/admin/AdminSubscriptions";
+import { AdminSettings } from "./pages/admin/AdminSettings";
 import { SuperAdminShell } from "./components/SuperAdminShell";
 import { PublicBalance } from "./pages/public/PublicBalance";
 import { PublicHistory } from "./pages/public/PublicHistory";
@@ -102,6 +103,7 @@ export default function App() {
         <Route path="/admin/identifiers" element={<RequireAuth status={status}><AdminIdentifiers /></RequireAuth>} />
         <Route path="/admin/cash" element={<RequireAuth status={status}><AdminCash /></RequireAuth>} />
         <Route path="/admin/subscriptions" element={<RequireAuth status={status}><AdminSubscriptions /></RequireAuth>} />
+        <Route path="/admin/settings" element={<RequireAuth status={status}><AdminSettings /></RequireAuth>} />
         <Route path="/public/balance" element={<PublicBalance />} />
         <Route path="/public/history" element={<PublicHistory />} />
       </Route>

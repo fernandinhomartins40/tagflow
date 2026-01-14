@@ -19,6 +19,36 @@ const urlBase64ToUint8Array = (base64String: string) => {
 export function usePushNotifications() {
   const [status, setStatus] = useState("idle");
 
+  const extractPayload = (subscription: PushSubscription) => {
+    const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+      return null;
+    }
+    return { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } };
+  };
+
+  const checkStatus = async () => {
+    if (!("serviceWorker" in navigator)) {
+      setStatus("SW nao suportado");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setStatus("Permissao negada");
+      return;
+    }
+    if (Notification.permission === "default") {
+      setStatus("Permissao pendente");
+      return;
+    }
+    if (!vapidPublicKey) {
+      setStatus("VAPID nao configurado");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    setStatus(subscription ? "inscrito" : "nao inscrito");
+  };
+
   const subscribe = async () => {
     if (!("serviceWorker" in navigator)) {
       setStatus("SW nao suportado");
@@ -50,6 +80,28 @@ export function usePushNotifications() {
     setStatus("inscrito");
   };
 
+  const unsubscribe = async () => {
+    if (!("serviceWorker" in navigator)) {
+      setStatus("SW nao suportado");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      setStatus("nao inscrito");
+      return;
+    }
+    const payload = extractPayload(subscription);
+    if (payload) {
+      await apiFetch("/api/notifications/unsubscribe", {
+        method: "DELETE",
+        body: JSON.stringify(payload)
+      });
+    }
+    await subscription.unsubscribe();
+    setStatus("removido");
+  };
+
   const sendTest = async () => {
     await apiFetch("/api/notifications/send", {
       method: "POST",
@@ -58,5 +110,5 @@ export function usePushNotifications() {
     setStatus("enviado");
   };
 
-  return { status, subscribe, sendTest };
+  return { status, subscribe, unsubscribe, sendTest, checkStatus };
 }

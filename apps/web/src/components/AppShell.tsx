@@ -34,7 +34,8 @@ const adminSections = [
     items: [
       { label: "Filiais", to: "/admin/branches" },
       { label: "Usuarios", to: "/admin/users" },
-      { label: "Assinaturas", to: "/admin/subscriptions" }
+      { label: "Assinaturas", to: "/admin/subscriptions" },
+      { label: "Configuracoes", to: "/admin/settings" }
     ]
   }
 ];
