@@ -26,6 +26,7 @@ export function AdminCustomers() {
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
@@ -51,7 +52,11 @@ export function AdminCustomers() {
       setBirthDate("");
       setPhone("");
       setCreditLimit("");
+      setFormError(null);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+    onError: (error) => {
+      setFormError(error instanceof Error ? error.message : "Falha ao cadastrar cliente.");
     }
   });
 
@@ -118,7 +123,29 @@ export function AdminCustomers() {
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
         </div>
-        <Button className="mt-3" onClick={() => createMutation.mutate()}>
+        {formError ? <p className="mt-3 text-sm text-rose-500">{formError}</p> : null}
+        <Button
+          className="mt-3"
+          onClick={() => {
+            const cpfDigits = onlyDigits(cpf);
+            const phoneDigits = onlyDigits(phone);
+            if (!name.trim()) {
+              setFormError("Informe o nome do cliente.");
+              return;
+            }
+            if (cpfDigits.length !== 11) {
+              setFormError("Informe um CPF valido.");
+              return;
+            }
+            if (phoneDigits.length < 10) {
+              setFormError("Informe um telefone valido.");
+              return;
+            }
+            setFormError(null);
+            createMutation.mutate();
+          }}
+          disabled={createMutation.isPending}
+        >
           {createMutation.isPending ? "Salvando..." : "Adicionar cliente"}
         </Button>
       </div>
