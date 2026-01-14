@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiFetch } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { Button } from "../../components/ui/button";
-import { ThemeToggleIcon } from "../../components/ThemeToggleIcon";
+import { ThemeToggleButton } from "../../components/ThemeToggleButton";
 import { useTheme } from "../../hooks/useTheme";
 
 interface LoginResponse {
@@ -25,7 +25,7 @@ export function SuperAdminLogin() {
   const [email, setEmail] = useState("superadmin@tagflow.local");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState<string | null>(null);
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const logoSrc = theme === "dark" ? "/logo-tagflow.png" : "/logo-tagflow-black.png";
 
   const loginMutation = useMutation({
@@ -70,14 +70,7 @@ export function SuperAdminLogin() {
       <div className="w-full max-w-md space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[#0f1115] dark:text-slate-100 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:p-8">
         <header className="space-y-2 text-center">
           <div className="flex justify-end">
-            <Button
-              variant="outline"
-              className="h-9 w-9 rounded-full p-0 text-slate-800 hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
-              onClick={toggleTheme}
-              aria-label="Alternar tema"
-            >
-              <ThemeToggleIcon theme={theme} className="text-emerald-500 dark:text-emerald-200" />
-            </Button>
+            <ThemeToggleButton className="text-emerald-500 dark:text-emerald-200" />
           </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Super admin</p>

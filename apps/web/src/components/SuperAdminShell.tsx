@@ -1,6 +1,6 @@
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { ThemeToggleIcon } from "./ThemeToggleIcon";
+import { ThemeToggleButton } from "./ThemeToggleButton";
 import { AdminSuperAdmin } from "../pages/admin/AdminSuperAdmin";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
@@ -13,7 +13,7 @@ export function SuperAdminShell() {
   const tenantId = useTenantStore((state) => state.tenantId);
   const navigate = useNavigate();
   const apiBaseUrl = getApiBaseUrl();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const logoSrc = theme === "dark" ? "/logo-tagflow.png" : "/logo-tagflow-black.png";
 
   if (!user) {
@@ -47,14 +47,7 @@ export function SuperAdminShell() {
             <span className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Super admin</span>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="h-9 w-9 rounded-full p-0 text-slate-800 hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
-              onClick={toggleTheme}
-              aria-label="Alternar tema"
-            >
-              <ThemeToggleIcon theme={theme} className="text-emerald-500 dark:text-emerald-200" />
-            </Button>
+            <ThemeToggleButton className="text-emerald-500 dark:text-emerald-200" />
             <Button variant="outline" onClick={handleLogout}>
               Sair
             </Button>

@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { ThemeToggleIcon } from "./ThemeToggleIcon";
+import { ThemeToggleButton } from "./ThemeToggleButton";
 import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
 import { getApiBaseUrl } from "../services/config";
@@ -128,7 +128,7 @@ export function AppShell() {
   const tenantId = useTenantStore((state) => state.tenantId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAuthenticated = status === "authenticated";
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const activePath = location.pathname;
 
@@ -193,14 +193,7 @@ export function AppShell() {
             <span className="hidden text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 md:inline">Painel</span>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="h-9 w-9 rounded-full p-0 text-slate-800 hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
-              onClick={toggleTheme}
-              aria-label="Alternar tema"
-            >
-              <ThemeToggleIcon theme={theme} className="text-orange-500 dark:text-amber-200" />
-            </Button>
+            <ThemeToggleButton />
             {isAuthenticated ? (
               <Button variant="outline" onClick={handleLogout}>
                 Sair
