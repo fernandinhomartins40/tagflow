@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/auth";
 import { useTenantStore } from "../store/tenant";
 import { getApiBaseUrl } from "../services/config";
 import { useTheme } from "../hooks/useTheme";
+import { usePushNotifications } from "../hooks/usePushNotifications";
 
 const adminSections = [
   {
@@ -128,8 +129,10 @@ export function AppShell() {
   const setTenantId = useTenantStore((state) => state.setTenantId);
   const tenantId = useTenantStore((state) => state.tenantId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
   const isAuthenticated = status === "authenticated";
   const { theme } = useTheme();
+  const push = usePushNotifications();
 
   const activePath = location.pathname;
 
@@ -169,6 +172,25 @@ export function AppShell() {
       navigate("/admin/pdv", { replace: true });
     }
   }, [isAuthenticated, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === "undefined") return;
+    if (!("Notification" in window)) return;
+    if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) return;
+    if (Notification.permission !== "default") return;
+    if (window.localStorage.getItem("tagflow-push-prompt")) return;
+    setShowPushPrompt(true);
+  }, [isAuthenticated]);
+
+  const isIos =
+    typeof window !== "undefined" &&
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone);
 
   const handleLogout = async () => {
     const headers = tenantId ? { "X-Tenant-Id": tenantId } : undefined;
@@ -210,7 +232,7 @@ export function AppShell() {
 
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         {isAuthenticated ? (
-          <aside className="hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] md:flex md:flex-col md:gap-6">
+          <aside className="admin-sidebar hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] md:flex md:flex-col md:gap-6">
             {adminSections.map((section) => (
               <div key={section.title}>
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{section.title}</p>
@@ -236,6 +258,45 @@ export function AppShell() {
         ) : null}
 
         <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] sm:p-6 sm:pb-6">
+          {isAuthenticated && showPushPrompt ? (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
+              {isIos && !isStandalone ? (
+                <>
+                  <p className="font-semibold">Notificacoes no iOS</p>
+                  <p className="mt-1">Para ativar push no iPhone/iPad, instale o app na Tela de Inicio.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">Ative notificacoes do painel</p>
+                  <p className="mt-1">Receba alertas de operacao e avisos importantes.</p>
+                </>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isIos && !isStandalone ? null : (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      window.localStorage.setItem("tagflow-push-prompt", "true");
+                      await push.subscribe();
+                      setShowPushPrompt(false);
+                    }}
+                  >
+                    Ativar notificacoes
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    window.localStorage.setItem("tagflow-push-prompt", "true");
+                    setShowPushPrompt(false);
+                  }}
+                >
+                  Agora nao
+                </Button>
+              </div>
+            </div>
+          ) : null}
           <Outlet />
         </main>
       </div>
@@ -289,7 +350,7 @@ export function AppShell() {
             onClick={() => setSidebarOpen(false)}
           />
           <aside
-            className={`absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition dark:bg-[#1b1613] ${
+            className={`admin-sidebar absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition dark:bg-[#1b1613] ${
               sidebarOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >
