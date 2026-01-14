@@ -67,7 +67,7 @@ export function SuperAdminLogin() {
         <div className="absolute -top-10 left-1/2 h-64 w-[420px] -translate-x-1/2 rounded-full bg-slate-500/20 blur-[120px] dark:bg-slate-500/20" />
         <div className="absolute bottom-10 right-10 h-56 w-56 rounded-full bg-emerald-500/20 blur-[140px] dark:bg-emerald-500/20" />
       </div>
-      <div className="w-full max-w-md space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[#0f1115] dark:text-slate-100 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:p-8">
+      <div className="w-full max-w-md space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:border-[#2a2420] dark:bg-[#120f0d] dark:text-neutral-100 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:p-8">
         <header className="space-y-2 text-center">
           <div className="flex justify-end">
             <ThemeToggleButton className="text-emerald-500 dark:text-emerald-200" />

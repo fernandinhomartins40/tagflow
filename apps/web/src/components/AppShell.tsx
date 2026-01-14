@@ -185,8 +185,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#120f0d] dark:text-neutral-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-[#2a2420] dark:bg-[#1b1613]/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
             <img src={logoSrc} alt="Tagflow" className="h-10 w-auto" />
@@ -209,7 +209,7 @@ export function AppShell() {
 
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         {isAuthenticated ? (
-          <aside className="hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:flex md:flex-col md:gap-6">
+          <aside className="hidden max-h-[calc(100vh-140px)] w-64 flex-shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] md:flex md:flex-col md:gap-6">
             {adminSections.map((section) => (
               <div key={section.title}>
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{section.title}</p>
@@ -234,13 +234,13 @@ export function AppShell() {
           </aside>
         ) : null}
 
-        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6 sm:pb-6">
+        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] sm:p-6 sm:pb-6">
           <Outlet />
         </main>
       </div>
 
       {isAuthenticated ? (
-        <nav className="fixed bottom-3 left-1/2 z-30 w-[92%] -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/95 px-4 py-2 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
+        <nav className="fixed bottom-3 left-1/2 z-30 w-[92%] -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/95 px-4 py-2 shadow-lg backdrop-blur dark:border-[#2a2420] dark:bg-[#1b1613]/95 md:hidden">
           <div className="grid grid-cols-5 items-center gap-2">
             {mobileNav.map((item) => {
               const isActive = item.to ? activePath === item.to : false;
@@ -288,7 +288,7 @@ export function AppShell() {
             onClick={() => setSidebarOpen(false)}
           />
           <aside
-            className={`absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition dark:bg-slate-900 ${
+            className={`absolute right-0 top-0 h-full w-72 overflow-y-auto bg-white p-5 shadow-2xl transition dark:bg-[#1b1613] ${
               sidebarOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >

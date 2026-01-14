@@ -39,8 +39,8 @@ export function SuperAdminShell() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#120f0d] dark:text-neutral-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-[#2a2420] dark:bg-[#1b1613]/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
             <img src={logoSrc} alt="Tagflow" className="h-10 w-auto" />
@@ -56,7 +56,7 @@ export function SuperAdminShell() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] sm:p-6">
           <AdminSuperAdmin />
         </div>
       </main>

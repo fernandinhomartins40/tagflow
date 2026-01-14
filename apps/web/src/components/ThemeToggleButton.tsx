@@ -14,7 +14,7 @@ export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
   const { theme, toggleTheme } = useTheme();
   const buttonClassName = [
     "inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-orange-500 shadow-sm transition hover:bg-slate-50",
-    "dark:border-slate-700 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-slate-800",
+    "dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-amber-200 dark:hover:bg-[#241e1a]",
     className
   ]
     .filter(Boolean)
