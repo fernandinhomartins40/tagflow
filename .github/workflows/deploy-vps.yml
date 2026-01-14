@@ -166,6 +166,14 @@ jobs:
               docker exec -i "$DB_CONTAINER" psql -U tagflow -d tagflow -v ON_ERROR_STOP=1 < "${MIGRATIONS_DIR}/seed_plans.sql"
             fi
 
+            API_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q api || true)
+            if [ -n "$API_CONTAINER" ]; then
+              echo "Executando migracao global de clientes..."
+              docker exec -i "$API_CONTAINER" bun /app/src/scripts/migrateGlobalCustomers.ts || echo "Aviso: migracao global falhou"
+            else
+              echo "Container da API nao encontrado para migracao global."
+            fi
+
             # Resolve upstream for host nginx (docker IP preferred)
             NGINX_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q nginx || true)
             UPSTREAM_IP=""
