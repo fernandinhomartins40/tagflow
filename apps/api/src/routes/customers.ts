@@ -1,18 +1,19 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { cashRegisters, creditPayments, customers, customerIdentifiers, transactions } from "../schema";
+import { cashRegisters, creditPayments, customers, customerIdentifiers, transactions, globalCustomers } from "../schema";
 import { and, eq, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
 import { validateCustomerLimit } from "../utils/planValidation";
+import { hashCustomerPassword, initialCustomerPassword, normalizeCpf, normalizePhone } from "../utils/customer";
 
 const customerSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
   name: z.string().min(2),
-  cpf: z.string().optional().nullable(),
+  cpf: z.string().min(11),
   birthDate: z.coerce.date().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  phone: z.string().min(8),
   email: z.string().email().optional().nullable(),
   credits: z.coerce.number().optional().nullable(),
   creditLimit: z.coerce.number().optional().nullable(),
@@ -32,6 +33,37 @@ const creditSchema = z.object({
 });
 
 export const customersRoutes = new Hono();
+
+const ensureGlobalCustomer = async (payload: { cpf: string; phone: string; name: string }) => {
+  const normalizedCpf = normalizeCpf(payload.cpf);
+  const normalizedPhone = normalizePhone(payload.phone);
+  const [existing] = await db.select().from(globalCustomers).where(eq(globalCustomers.cpf, normalizedCpf));
+  if (existing) {
+    if (existing.phone !== normalizedPhone || existing.name !== payload.name) {
+      await db
+        .update(globalCustomers)
+        .set({
+          phone: normalizedPhone,
+          name: payload.name,
+          updatedAt: new Date()
+        })
+        .where(eq(globalCustomers.id, existing.id));
+    }
+    return existing.id;
+  }
+
+  const passwordHash = await hashCustomerPassword(initialCustomerPassword(payload.name));
+  const [created] = await db
+    .insert(globalCustomers)
+    .values({
+      cpf: normalizedCpf,
+      phone: normalizedPhone,
+      name: payload.name,
+      passwordHash
+    })
+    .returning();
+  return created.id;
+};
 
 customersRoutes.get("/", async (c) => {
   const tenantId = getTenantId(c);
@@ -56,7 +88,37 @@ customersRoutes.post("/", async (c) => {
   if (limitCheck) return limitCheck;
 
   const body = customerSchema.parse(await c.req.json());
-  const [created] = await db.insert(customers).values({ ...body, companyId: tenantId }).returning();
+  const normalizedCpf = normalizeCpf(body.cpf);
+  const normalizedPhone = normalizePhone(body.phone);
+  if (!normalizedCpf || !normalizedPhone) {
+    return c.json({ error: "CPF e telefone sao obrigatorios" }, 400);
+  }
+
+  const [existingLocal] = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.companyId, tenantId), eq(customers.cpf, normalizedCpf)));
+  if (existingLocal) {
+    return c.json({ error: "Cliente ja cadastrado nesta empresa" }, 409);
+  }
+
+  const globalCustomerId = await ensureGlobalCustomer({
+    cpf: normalizedCpf,
+    phone: normalizedPhone,
+    name: body.name
+  });
+
+  const [created] = await db
+    .insert(customers)
+    .values({
+      ...body,
+      companyId: tenantId,
+      cpf: normalizedCpf,
+      phone: normalizedPhone,
+      globalCustomerId
+    })
+    .returning();
+
   return c.json(created, 201);
 });
 
@@ -64,11 +126,32 @@ customersRoutes.put("/:id", async (c) => {
   const tenantId = getTenantId(c);
   const id = c.req.param("id");
   const body = customerSchema.partial().parse(await c.req.json());
+  const normalizedCpf = body.cpf ? normalizeCpf(body.cpf) : undefined;
+  const normalizedPhone = body.phone ? normalizePhone(body.phone) : undefined;
+  let globalCustomerId: string | undefined;
+
+  if (normalizedCpf && normalizedPhone && body.name) {
+    globalCustomerId = await ensureGlobalCustomer({
+      cpf: normalizedCpf,
+      phone: normalizedPhone,
+      name: body.name
+    });
+  }
+
   const [updated] = await db
     .update(customers)
     .set(body)
     .where(and(eq(customers.id, id), eq(customers.companyId, tenantId)))
     .returning();
+
+  if (updated && globalCustomerId) {
+    const [linked] = await db
+      .update(customers)
+      .set({ cpf: normalizedCpf ?? updated.cpf, phone: normalizedPhone ?? updated.phone, globalCustomerId })
+      .where(and(eq(customers.id, id), eq(customers.companyId, tenantId)))
+      .returning();
+    return c.json(linked ?? updated);
+  }
 
   return c.json(updated ?? { id, updated: false });
 });

@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, boolean, numeric, date } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, boolean, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const companies = pgTable("companies", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -66,6 +66,7 @@ export const users = pgTable("users", {
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),
   companyId: uuid("company_id").notNull(),
+  globalCustomerId: uuid("global_customer_id"),
   branchId: uuid("branch_id"),
   name: text("name").notNull(),
   cpf: text("cpf"),
@@ -77,6 +78,23 @@ export const customers = pgTable("customers", {
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
+
+export const globalCustomers = pgTable(
+  "global_customers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    cpf: text("cpf").notNull(),
+    name: text("name").notNull(),
+    phone: text("phone").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    cpfUnique: uniqueIndex("global_customers_cpf_unique").on(table.cpf),
+    phoneUnique: uniqueIndex("global_customers_phone_unique").on(table.phone)
+  })
+);
 
 export const customerIdentifiers = pgTable("customer_identifiers", {
   id: uuid("id").defaultRandom().primaryKey(),

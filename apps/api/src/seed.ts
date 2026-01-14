@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { branches, companies, customerIdentifiers, customers, locations, plans, products, services, users } from "./schema";
+import { branches, companies, customerIdentifiers, customers, globalCustomers, locations, plans, products, services, users } from "./schema";
+import { initialCustomerPassword } from "./utils/customer";
 
 const demoCompanyId = "11111111-1111-1111-1111-111111111111";
 const mainBranchId = "22222222-2222-2222-2222-222222222222";
@@ -146,154 +147,183 @@ const run = async () => {
     ])
     .onConflictDoNothing();
 
+  const seededCustomers = [
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000001",
+      id: "c0000000-0000-0000-0000-000000000001",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Carlos Silva",
+      cpf: "12345678900",
+      birthDate: "1988-04-12",
+      phone: "11999990001",
+      email: "carlos@demo.local",
+      credits: "120.00",
+      creditLimit: "300.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000002",
+      id: "c0000000-0000-0000-0000-000000000002",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Fernanda Costa",
+      cpf: "98765432100",
+      birthDate: "1992-11-30",
+      phone: "11999990002",
+      email: "fernanda@demo.local",
+      credits: "40.00",
+      creditLimit: "150.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000003",
+      id: "c0000000-0000-0000-0000-000000000003",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Joao Pereira",
+      cpf: "11122233344",
+      birthDate: "1985-02-20",
+      phone: "11999990003",
+      email: "joao@demo.local",
+      credits: "0.00",
+      creditLimit: "200.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000004",
+      id: "c0000000-0000-0000-0000-000000000004",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Marina Rocha",
+      cpf: "22233344455",
+      birthDate: "1995-06-18",
+      phone: "11999990004",
+      email: "marina@demo.local",
+      credits: "85.00",
+      creditLimit: "250.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000005",
+      id: "c0000000-0000-0000-0000-000000000005",
+      companyId: demoCompanyId,
+      branchId: parkBranchId,
+      name: "Bruno Almeida",
+      cpf: "33344455566",
+      birthDate: "1990-01-05",
+      phone: "11999990005",
+      email: "bruno@demo.local",
+      credits: "30.00",
+      creditLimit: "100.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000006",
+      id: "c0000000-0000-0000-0000-000000000006",
+      companyId: demoCompanyId,
+      branchId: parkBranchId,
+      name: "Larissa Gomes",
+      cpf: "44455566677",
+      birthDate: "1997-09-09",
+      phone: "11999990006",
+      email: "larissa@demo.local",
+      credits: "60.00",
+      creditLimit: "180.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000007",
+      id: "c0000000-0000-0000-0000-000000000007",
+      companyId: demoCompanyId,
+      branchId: parkBranchId,
+      name: "Diego Moreira",
+      cpf: "55566677788",
+      birthDate: "1983-07-28",
+      phone: "11999990007",
+      email: "diego@demo.local",
+      credits: "10.00",
+      creditLimit: "120.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000008",
+      id: "c0000000-0000-0000-0000-000000000008",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Renata Souza",
+      cpf: "66677788899",
+      birthDate: "1989-12-02",
+      phone: "11999990008",
+      email: "renata@demo.local",
+      credits: "200.00",
+      creditLimit: "400.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000009",
+      id: "c0000000-0000-0000-0000-000000000009",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Andre Lima",
+      cpf: "77788899900",
+      birthDate: "1991-03-23",
+      phone: "11999990009",
+      email: "andre@demo.local",
+      credits: "25.00",
+      creditLimit: "90.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000010",
+      id: "c0000000-0000-0000-0000-000000000010",
+      companyId: demoCompanyId,
+      branchId: parkBranchId,
+      name: "Paula Mendes",
+      cpf: "88899900011",
+      birthDate: "1994-05-15",
+      phone: "11999990010",
+      email: "paula@demo.local",
+      credits: "75.00",
+      creditLimit: "220.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000011",
+      id: "c0000000-0000-0000-0000-000000000011",
+      companyId: demoCompanyId,
+      branchId: mainBranchId,
+      name: "Rafael Barreto",
+      cpf: "99900011122",
+      birthDate: "1987-08-11",
+      phone: "11999990011",
+      email: "rafael@demo.local",
+      credits: "15.00",
+      creditLimit: "110.00"
+    },
+    {
+      globalCustomerId: "g0000000-0000-0000-0000-000000000012",
+      id: "c0000000-0000-0000-0000-000000000012",
+      companyId: demoCompanyId,
+      branchId: parkBranchId,
+      name: "Camila Nunes",
+      cpf: "00011122233",
+      birthDate: "1998-10-19",
+      phone: "11999990012",
+      email: "camila@demo.local",
+      credits: "55.00",
+      creditLimit: "160.00"
+    }
+  ];
+
+  const globalSeed = await Promise.all(
+    seededCustomers.map(async (customer) => ({
+      id: customer.globalCustomerId,
+      cpf: customer.cpf!,
+      name: customer.name,
+      phone: customer.phone!,
+      passwordHash: await bcrypt.hash(initialCustomerPassword(customer.name), 10)
+    }))
+  );
+
+  await db
+    .insert(globalCustomers)
+    .values(globalSeed)
+    .onConflictDoNothing();
+
   await db
     .insert(customers)
-    .values([
-      {
-        id: "c0000000-0000-0000-0000-000000000001",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Carlos Silva",
-        cpf: "123.456.789-00",
-        birthDate: "1988-04-12",
-        phone: "11999990001",
-        email: "carlos@demo.local",
-        credits: "120.00",
-        creditLimit: "300.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000002",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Fernanda Costa",
-        cpf: "987.654.321-00",
-        birthDate: "1992-11-30",
-        phone: "11999990002",
-        email: "fernanda@demo.local",
-        credits: "40.00",
-        creditLimit: "150.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000003",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Joao Pereira",
-        cpf: "111.222.333-44",
-        birthDate: "1985-02-20",
-        phone: "11999990003",
-        email: "joao@demo.local",
-        credits: "0.00",
-        creditLimit: "200.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000004",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Marina Rocha",
-        cpf: "222.333.444-55",
-        birthDate: "1995-06-18",
-        phone: "11999990004",
-        email: "marina@demo.local",
-        credits: "85.00",
-        creditLimit: "250.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000005",
-        companyId: demoCompanyId,
-        branchId: parkBranchId,
-        name: "Bruno Almeida",
-        cpf: "333.444.555-66",
-        birthDate: "1990-01-05",
-        phone: "11999990005",
-        email: "bruno@demo.local",
-        credits: "30.00",
-        creditLimit: "100.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000006",
-        companyId: demoCompanyId,
-        branchId: parkBranchId,
-        name: "Larissa Gomes",
-        cpf: "444.555.666-77",
-        birthDate: "1997-09-09",
-        phone: "11999990006",
-        email: "larissa@demo.local",
-        credits: "60.00",
-        creditLimit: "180.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000007",
-        companyId: demoCompanyId,
-        branchId: parkBranchId,
-        name: "Diego Moreira",
-        cpf: "555.666.777-88",
-        birthDate: "1983-07-28",
-        phone: "11999990007",
-        email: "diego@demo.local",
-        credits: "10.00",
-        creditLimit: "120.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000008",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Renata Souza",
-        cpf: "666.777.888-99",
-        birthDate: "1989-12-02",
-        phone: "11999990008",
-        email: "renata@demo.local",
-        credits: "200.00",
-        creditLimit: "400.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000009",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Andre Lima",
-        cpf: "777.888.999-00",
-        birthDate: "1991-03-23",
-        phone: "11999990009",
-        email: "andre@demo.local",
-        credits: "25.00",
-        creditLimit: "90.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000010",
-        companyId: demoCompanyId,
-        branchId: parkBranchId,
-        name: "Paula Mendes",
-        cpf: "888.999.000-11",
-        birthDate: "1994-05-15",
-        phone: "11999990010",
-        email: "paula@demo.local",
-        credits: "75.00",
-        creditLimit: "220.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000011",
-        companyId: demoCompanyId,
-        branchId: mainBranchId,
-        name: "Rafael Barreto",
-        cpf: "999.000.111-22",
-        birthDate: "1987-08-11",
-        phone: "11999990011",
-        email: "rafael@demo.local",
-        credits: "15.00",
-        creditLimit: "110.00"
-      },
-      {
-        id: "c0000000-0000-0000-0000-000000000012",
-        companyId: demoCompanyId,
-        branchId: parkBranchId,
-        name: "Camila Nunes",
-        cpf: "000.111.222-33",
-        birthDate: "1998-10-19",
-        phone: "11999990012",
-        email: "camila@demo.local",
-        credits: "55.00",
-        creditLimit: "160.00"
-      }
-    ])
+    .values(seededCustomers)
     .onConflictDoNothing();
 
   await db

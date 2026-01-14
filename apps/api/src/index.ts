@@ -24,6 +24,7 @@ import { cashRoutes } from "./routes/cash";
 import { superAdminRoutes } from "./routes/superadmin";
 import { stripeRoutes } from "./routes/stripe";
 import { billingRoutes } from "./routes/billing";
+import { customerRoutes } from "./routes/customer";
 
 const app = new Hono();
 
@@ -53,6 +54,7 @@ app.get("/uploads/:tenant/:file", (c) => {
 app.route("/api/auth", authRoutes);
 app.route("/auth", authRoutes);
 app.route("/api/stripe", stripeRoutes);
+app.route("/api/customer", customerRoutes);
 
 const superAdmin = new Hono();
 superAdmin.use("/*", authMiddleware);

@@ -26,6 +26,8 @@ export const tenantMiddleware = async (c: Context, next: Next) => {
     path.startsWith("/auth/me") ||
     path.startsWith("/api/auth/logout") ||
     path.startsWith("/auth/logout") ||
+    path.startsWith("/api/customer") ||
+    path.startsWith("/customer") ||
     path.startsWith("/api/public/plans") ||
     path.startsWith("/public/plans")
   ) {

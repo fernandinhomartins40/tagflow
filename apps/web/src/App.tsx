@@ -26,6 +26,9 @@ import { getApiBaseUrl } from "./services/config";
 import { MarketingLanding } from "./pages/MarketingLanding";
 import { SuperAdminLogin } from "./pages/superadmin/SuperAdminLogin";
 import { Signup } from "./pages/public/Signup";
+import { CustomerLogin } from "./pages/customer/CustomerLogin";
+import { CustomerShell } from "./pages/customer/CustomerShell";
+import { CustomerDashboard } from "./pages/customer/CustomerDashboard";
 
 export default function App() {
   const status = useAuthStore((state) => state.status);
@@ -79,6 +82,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={isStandalone ? <Navigate to="/login" replace /> : <MarketingLanding />} />
+      <Route path="/cliente/login" element={<CustomerLogin />} />
+      <Route element={<CustomerShell />}>
+        <Route path="/cliente" element={<CustomerDashboard />} />
+      </Route>
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
       <Route element={<AppShell />}>
         <Route
