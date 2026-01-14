@@ -18,9 +18,12 @@ const moonIcon = <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />;
 
 export function ThemeToggleIcon({ theme, className }: { theme: ThemeMode; className?: string }) {
   const iconClassName = ["h-5 w-5", className].filter(Boolean).join(" ");
+  const color = theme === "dark" ? "#fde68a" : "#f97316";
 
   return (
     <svg
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -28,7 +31,7 @@ export function ThemeToggleIcon({ theme, className }: { theme: ThemeMode; classN
       strokeLinecap="round"
       strokeLinejoin="round"
       className={iconClassName}
-      style={{ display: "block" }}
+      style={{ display: "block", color }}
       aria-hidden="true"
     >
       {theme === "dark" ? sunIcon : moonIcon}
