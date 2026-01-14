@@ -16,19 +16,18 @@ const sunIcon = (
 
 const moonIcon = <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />;
 
-export function ThemeToggleIcon({ theme }: { theme: ThemeMode }) {
-  const stroke = theme === "dark" ? "#fde68a" : "#f97316";
+export function ThemeToggleIcon({ theme, className }: { theme: ThemeMode; className?: string }) {
+  const iconClassName = ["h-5 w-5", className].filter(Boolean).join(" ");
 
   return (
     <svg
-      width="20"
-      height="20"
       viewBox="0 0 24 24"
       fill="none"
-      stroke={stroke}
+      stroke="currentColor"
       strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className={iconClassName}
       style={{ display: "block" }}
       aria-hidden="true"
     >

@@ -53,7 +53,7 @@ export function SuperAdminShell() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              <ThemeToggleIcon theme={theme} />
+              <ThemeToggleIcon theme={theme} className="text-emerald-500 dark:text-emerald-200" />
             </Button>
             <Button variant="outline" onClick={handleLogout}>
               Sair

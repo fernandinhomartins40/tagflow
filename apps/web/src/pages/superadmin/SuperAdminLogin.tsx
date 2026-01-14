@@ -76,7 +76,7 @@ export function SuperAdminLogin() {
               onClick={toggleTheme}
               aria-label="Alternar tema"
             >
-              <ThemeToggleIcon theme={theme} />
+              <ThemeToggleIcon theme={theme} className="text-emerald-500 dark:text-emerald-200" />
             </Button>
           </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />

@@ -5,7 +5,6 @@ import { apiFetch } from "../../services/api";
 import { useAuthStore } from "../../store/auth";
 import { useTenantStore } from "../../store/tenant";
 import { Button } from "../../components/ui/button";
-import { ThemeToggleIcon } from "../../components/ThemeToggleIcon";
 import { useTheme } from "../../hooks/useTheme";
 
 interface LoginResponse {
@@ -26,7 +25,7 @@ export function AdminLogin() {
   const [email, setEmail] = useState("admin@tagflow.local");
   const [password, setPassword] = useState("admin123");
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const logoSrc = theme === "dark" ? "/logo-tagflow.png" : "/logo-tagflow-black.png";
   const isIos =
     typeof window !== "undefined" &&
@@ -82,16 +81,6 @@ export function AdminLogin() {
       </div>
       <div className="w-full max-w-md space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 text-slate-900 shadow-[0_20px_60px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#120f0d] dark:text-slate-100 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:p-8">
         <header className="space-y-2 text-center">
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              className="h-9 w-9 rounded-full p-0 text-slate-800 hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
-              onClick={toggleTheme}
-              aria-label="Alternar tema"
-            >
-              <ThemeToggleIcon theme={theme} />
-            </Button>
-          </div>
           <img src={logoSrc} alt="Tagflow" className="mx-auto h-14 w-auto" />
           <p className="text-xs uppercase tracking-[0.3em] text-orange-600 dark:text-orange-200">Acesso</p>
           <h2 className="text-2xl font-semibold">Entrar no painel</h2>
