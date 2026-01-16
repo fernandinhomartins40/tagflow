@@ -39,12 +39,18 @@ const run = async () => {
           "Comandas basicas",
           "Notificacoes push"
         ]),
-        limits: JSON.stringify([
-          "1 filial",
-          "2 usuarios",
-          "100 clientes",
-          "10 reservas/mes"
-        ]),
+        limits: JSON.stringify({
+          maxBranches: 1,
+          maxUsers: 2,
+          maxCustomers: 100,
+          maxBookingsPerMonth: 10,
+          features: {
+            advancedReports: false,
+            accountSplitting: false,
+            apiAccess: false,
+            prioritySupport: false
+          }
+        }),
         active: true
       },
       {
@@ -65,12 +71,18 @@ const run = async () => {
           "Notificacoes push",
           "Backup automatico"
         ]),
-        limits: JSON.stringify([
-          "2 filiais",
-          "5 usuarios",
-          "1.000 clientes",
-          "100 reservas/mes"
-        ]),
+        limits: JSON.stringify({
+          maxBranches: 2,
+          maxUsers: 5,
+          maxCustomers: 1000,
+          maxBookingsPerMonth: 100,
+          features: {
+            advancedReports: false,
+            accountSplitting: false,
+            apiAccess: false,
+            prioritySupport: false
+          }
+        }),
         active: true
       },
       {
@@ -92,12 +104,18 @@ const run = async () => {
           "Webhooks personalizados",
           "Exportacao de dados"
         ]),
-        limits: JSON.stringify([
-          "5 filiais",
-          "20 usuarios",
-          "10.000 clientes",
-          "1.000 reservas/mes"
-        ]),
+        limits: JSON.stringify({
+          maxBranches: 5,
+          maxUsers: 20,
+          maxCustomers: 10000,
+          maxBookingsPerMonth: 1000,
+          features: {
+            advancedReports: true,
+            accountSplitting: true,
+            apiAccess: true,
+            prioritySupport: true
+          }
+        }),
         active: true
       }
     ])

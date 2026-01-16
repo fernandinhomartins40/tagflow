@@ -15,27 +15,19 @@ const fallbackPricing = [
   },
   {
     name: "Start",
-    price: "R$ 249",
+    price: "R$ 97",
     description: "Operacao organizada e vendas mais rapidas.",
-    features: ["2 filiais", "5 operadores", "2.000 clientes", "NFC e codigo de barras", "Relatorios simples"],
+    features: ["2 filiais", "5 operadores", "1.000 clientes", "NFC e codigo de barras", "Relatorios simples"],
     cta: "Assinar Start",
     highlight: false
   },
   {
-    name: "Growth",
-    price: "R$ 649",
-    description: "Mais controle, mais recursos e escala.",
-    features: ["5 filiais", "15 operadores", "10.000 clientes", "Divisao de contas", "Indicadores ao vivo"],
-    cta: "Assinar Growth",
+    name: "Prime",
+    price: "R$ 197",
+    description: "Recursos premium para maxima performance.",
+    features: ["5 filiais", "20 operadores", "10.000 clientes", "Divisao de contas", "Relatorios avancados"],
+    cta: "Assinar Prime",
     highlight: true
-  },
-  {
-    name: "Enterprise",
-    price: "Sob consulta",
-    description: "Customizacoes, SLA e alto volume.",
-    features: ["Filiais ilimitadas", "Ambiente isolado", "Relatorios custom", "SSO e auditoria"],
-    cta: "Falar com vendas",
-    highlight: false
   }
 ];
 
@@ -106,7 +98,7 @@ const faqs = [
   },
   {
     q: "Posso usar meu dominio?",
-    a: "Nos planos Growth e Enterprise voce usa seu dominio."
+    a: "Nos planos Start e Prime voce usa seu dominio."
   }
 ];
 
@@ -136,7 +128,7 @@ export function MarketingLanding() {
         description: plan.description ?? "Plano ideal para crescer.",
         features: buildPlanFeatures(plan),
         cta: plan.name.toLowerCase() === "free" ? "Testar gratis" : `Assinar ${plan.name}`,
-        highlight: plan.name.toLowerCase() === "growth"
+        highlight: plan.name.toLowerCase() === "prime"
       }))
     : fallbackPricing;
 
@@ -440,6 +432,9 @@ function parsePlanList(value?: string | null): string[] {
     if (Array.isArray(parsed)) {
       return parsed.map((item) => String(item)).filter(Boolean);
     }
+    if (parsed && typeof parsed === "object") {
+      return planLimitsToList(parsed as Record<string, unknown>);
+    }
   } catch {
     // ignore
   }
@@ -447,6 +442,15 @@ function parsePlanList(value?: string | null): string[] {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function planLimitsToList(limits: Record<string, unknown>): string[] {
+  const items: string[] = [];
+  if (typeof limits.maxBranches === "number") items.push(`${limits.maxBranches} filiais`);
+  if (typeof limits.maxUsers === "number") items.push(`${limits.maxUsers} usuarios`);
+  if (typeof limits.maxCustomers === "number") items.push(`${limits.maxCustomers} clientes`);
+  if (typeof limits.maxBookingsPerMonth === "number") items.push(`${limits.maxBookingsPerMonth} reservas/mes`);
+  return items;
 }
 
 function buildPlanFeatures(plan: { features?: string | null; tools?: string | null; limits?: string | null }) {

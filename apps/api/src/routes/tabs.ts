@@ -4,6 +4,7 @@ import { db } from "../db";
 import { bookings, cashRegisters, customerIdentifiers, customers, locations, tabItemParticipants, tabItems, tabPayments, tabs, transactions } from "../schema";
 import { and, eq, inArray, lte, gte, or, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
+import { validateFeatureAccess } from "../utils/planValidation";
 
 const openSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
@@ -176,6 +177,8 @@ tabsRoutes.post("/items", async (c) => {
 
 tabsRoutes.post("/items/participants", async (c) => {
   const tenantId = getTenantId(c);
+  const featureCheck = await validateFeatureAccess(c, tenantId, "accountSplitting", "Divisao de contas");
+  if (featureCheck) return featureCheck;
   const body = participantsSchema.parse(await c.req.json());
 
   await db.delete(tabItemParticipants).where(

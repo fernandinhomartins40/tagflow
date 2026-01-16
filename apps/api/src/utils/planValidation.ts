@@ -13,7 +13,7 @@ export const validateBranchLimit = async (c: Context, companyId: string) => {
     return c.json(
       {
         error: "Limite de filiais atingido",
-        message: `Seu plano permite apenas ${check.max} filial(is). Você já tem ${check.current}. Faça upgrade para adicionar mais.`,
+        message: `Seu plano permite apenas ${check.max} filial(is). Voce ja tem ${check.current}. Faca upgrade para adicionar mais.`,
         limit: check.max,
         current: check.current
       },
@@ -28,8 +28,8 @@ export const validateUserLimit = async (c: Context, companyId: string) => {
   if (!check.allowed) {
     return c.json(
       {
-        error: "Limite de usuários atingido",
-        message: `Seu plano permite apenas ${check.max} usuário(s). Você já tem ${check.current}. Faça upgrade para adicionar mais.`,
+        error: "Limite de usuarios atingido",
+        message: `Seu plano permite apenas ${check.max} usuario(s). Voce ja tem ${check.current}. Faca upgrade para adicionar mais.`,
         limit: check.max,
         current: check.current
       },
@@ -45,7 +45,7 @@ export const validateCustomerLimit = async (c: Context, companyId: string) => {
     return c.json(
       {
         error: "Limite de clientes atingido",
-        message: `Seu plano permite apenas ${check.max} cliente(s). Você já tem ${check.current}. Faça upgrade para adicionar mais.`,
+        message: `Seu plano permite apenas ${check.max} cliente(s). Voce ja tem ${check.current}. Faca upgrade para adicionar mais.`,
         limit: check.max,
         current: check.current
       },
@@ -61,7 +61,7 @@ export const validateBookingLimit = async (c: Context, companyId: string) => {
     return c.json(
       {
         error: "Limite de reservas atingido",
-        message: `Seu plano permite apenas ${check.max} reserva(s) por mês. Você já tem ${check.current}. Faça upgrade para adicionar mais.`,
+        message: `Seu plano permite apenas ${check.max} reserva(s) por mes. Voce ja tem ${check.current}. Faca upgrade para adicionar mais.`,
         limit: check.max,
         current: check.current
       },
@@ -81,8 +81,8 @@ export const validateFeatureAccess = async (
   if (!hasAccess) {
     return c.json(
       {
-        error: "Recurso indisponível no seu plano",
-        message: `${featureName} está disponível apenas em planos superiores. Faça upgrade para ter acesso.`,
+        error: "Recurso indisponivel no seu plano",
+        message: `${featureName} esta disponivel apenas em planos superiores. Faca upgrade para ter acesso.`,
         feature
       },
       403
@@ -90,3 +90,5 @@ export const validateFeatureAccess = async (
   }
   return null;
 };
+
+

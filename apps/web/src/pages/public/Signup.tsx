@@ -246,6 +246,9 @@ function parsePlanList(value?: string | null): string[] {
     if (Array.isArray(parsed)) {
       return parsed.map((item) => String(item)).filter(Boolean);
     }
+    if (parsed && typeof parsed === "object") {
+      return planLimitsToList(parsed as Record<string, unknown>);
+    }
   } catch {
     // ignore
   }
@@ -253,6 +256,15 @@ function parsePlanList(value?: string | null): string[] {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function planLimitsToList(limits: Record<string, unknown>): string[] {
+  const items: string[] = [];
+  if (typeof limits.maxBranches === "number") items.push(`${limits.maxBranches} filiais`);
+  if (typeof limits.maxUsers === "number") items.push(`${limits.maxUsers} usuarios`);
+  if (typeof limits.maxCustomers === "number") items.push(`${limits.maxCustomers} clientes`);
+  if (typeof limits.maxBookingsPerMonth === "number") items.push(`${limits.maxBookingsPerMonth} reservas/mes`);
+  return items;
 }
 
 function buildPlanFeatures(plan: { features?: string | null; tools?: string | null; limits?: string | null }) {

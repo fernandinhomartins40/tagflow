@@ -3,6 +3,7 @@ import { db } from "../db";
 import { bookings, customers, transactions } from "../schema";
 import { and, eq, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
+import { validateFeatureAccess } from "../utils/planValidation";
 
 const parseRange = (startAt?: string, endAt?: string) => {
   const start = startAt ? new Date(startAt) : new Date(new Date().setDate(new Date().getDate() - 30));
@@ -34,6 +35,8 @@ reportsRoutes.get("/sales", async (c) => {
 
 reportsRoutes.get("/occupancy", async (c) => {
   const tenantId = getTenantId(c);
+  const featureCheck = await validateFeatureAccess(c, tenantId, "advancedReports", "Relatorios avancados");
+  if (featureCheck) return featureCheck;
   const { start, end } = parseRange(c.req.query("startAt"), c.req.query("endAt"));
   const branchId = c.req.query("branchId");
 
@@ -55,6 +58,8 @@ reportsRoutes.get("/occupancy", async (c) => {
 
 reportsRoutes.get("/customers", async (c) => {
   const tenantId = getTenantId(c);
+  const featureCheck = await validateFeatureAccess(c, tenantId, "advancedReports", "Relatorios avancados");
+  if (featureCheck) return featureCheck;
   const branchId = c.req.query("branchId");
 
   const data = await db

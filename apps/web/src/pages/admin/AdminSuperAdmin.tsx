@@ -115,7 +115,14 @@ const emptyPlanForm = {
   stripePriceId: "",
   features: "",
   tools: "",
-  limits: "",
+  maxBranches: 1,
+  maxUsers: 2,
+  maxCustomers: 100,
+  maxBookingsPerMonth: 10,
+  featureAdvancedReports: false,
+  featureAccountSplitting: false,
+  featureApiAccess: false,
+  featurePrioritySupport: false,
   active: true
 };
 
@@ -345,6 +352,7 @@ export function AdminSuperAdmin() {
   };
 
   const openEditPlan = (plan: Plan) => {
+    const limits = parsePlanLimits(plan.limits);
     setEditingPlan(plan);
     setPlanForm({
       name: plan.name ?? "",
@@ -354,7 +362,14 @@ export function AdminSuperAdmin() {
       stripePriceId: plan.stripePriceId ?? "",
       features: formatPlanList(plan.features),
       tools: formatPlanList(plan.tools),
-      limits: formatPlanList(plan.limits),
+      maxBranches: limits.maxBranches,
+      maxUsers: limits.maxUsers,
+      maxCustomers: limits.maxCustomers,
+      maxBookingsPerMonth: limits.maxBookingsPerMonth,
+      featureAdvancedReports: limits.features.advancedReports,
+      featureAccountSplitting: limits.features.accountSplitting,
+      featureApiAccess: limits.features.apiAccess,
+      featurePrioritySupport: limits.features.prioritySupport,
       active: plan.active ?? true
     });
     setPlanError(null);
@@ -470,7 +485,7 @@ export function AdminSuperAdmin() {
       stripePriceId: planForm.stripePriceId.trim(),
       features: serializePlanList(planForm.features),
       tools: serializePlanList(planForm.tools),
-      limits: serializePlanList(planForm.limits),
+      limits: serializePlanLimits(planForm),
       active: planForm.active
     };
     if (editingPlan) {
@@ -995,16 +1010,75 @@ export function AdminSuperAdmin() {
               placeholder="Valor mensal"
               className="w-full rounded-xl border border-slate-200 px-3 py-2"
             />
+            <input
+              type="number"
+              value={planForm.maxBranches}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, maxBranches: Number(event.target.value) }))}
+              placeholder="Max filiais"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <input
+              type="number"
+              value={planForm.maxUsers}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, maxUsers: Number(event.target.value) }))}
+              placeholder="Max usuarios"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <input
+              type="number"
+              value={planForm.maxCustomers}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, maxCustomers: Number(event.target.value) }))}
+              placeholder="Max clientes"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <input
+              type="number"
+              value={planForm.maxBookingsPerMonth}
+              onChange={(event) => setPlanForm((prev) => ({ ...prev, maxBookingsPerMonth: Number(event.target.value) }))}
+              placeholder="Max reservas/mes"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+            />
+            <div className="rounded-2xl border border-slate-200 p-3 sm:col-span-2">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Features do plano</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={planForm.featureAdvancedReports}
+                    onChange={(event) => setPlanForm((prev) => ({ ...prev, featureAdvancedReports: event.target.checked }))}
+                  />
+                  Relatorios avancados
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={planForm.featureAccountSplitting}
+                    onChange={(event) => setPlanForm((prev) => ({ ...prev, featureAccountSplitting: event.target.checked }))}
+                  />
+                  Divisao de contas
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={planForm.featureApiAccess}
+                    onChange={(event) => setPlanForm((prev) => ({ ...prev, featureApiAccess: event.target.checked }))}
+                  />
+                  Acesso a API
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={planForm.featurePrioritySupport}
+                    onChange={(event) => setPlanForm((prev) => ({ ...prev, featurePrioritySupport: event.target.checked }))}
+                  />
+                  Suporte prioritario
+                </label>
+              </div>
+            </div>
             <textarea
               value={planForm.features}
               onChange={(event) => setPlanForm((prev) => ({ ...prev, features: event.target.value }))}
               placeholder="Ferramentas (uma por linha)"
-              className="min-h-[120px] w-full rounded-xl border border-slate-200 px-3 py-2 sm:col-span-2"
-            />
-            <textarea
-              value={planForm.limits}
-              onChange={(event) => setPlanForm((prev) => ({ ...prev, limits: event.target.value }))}
-              placeholder="Limites (uma por linha)"
               className="min-h-[120px] w-full rounded-xl border border-slate-200 px-3 py-2 sm:col-span-2"
             />
             <textarea
@@ -1115,6 +1189,9 @@ function parsePlanList(value?: string | null): string[] {
     if (Array.isArray(parsed)) {
       return parsed.map((item) => String(item)).filter(Boolean);
     }
+    if (parsed && typeof parsed === "object") {
+      return planLimitsToList(parsed as Record<string, unknown>);
+    }
   } catch {
     // ignore
   }
@@ -1135,6 +1212,66 @@ function serializePlanList(value: string) {
 function formatPlanList(value?: string | null) {
   const list = parsePlanList(value);
   return list.length ? list.join(", ") : "";
+}
+
+function planLimitsToList(limits: Record<string, unknown>): string[] {
+  const items: string[] = [];
+  if (typeof limits.maxBranches === "number") items.push(`${limits.maxBranches} filiais`);
+  if (typeof limits.maxUsers === "number") items.push(`${limits.maxUsers} usuarios`);
+  if (typeof limits.maxCustomers === "number") items.push(`${limits.maxCustomers} clientes`);
+  if (typeof limits.maxBookingsPerMonth === "number") items.push(`${limits.maxBookingsPerMonth} reservas/mes`);
+  return items;
+}
+
+function parsePlanLimits(value?: string | null) {
+  const base = {
+    maxBranches: 1,
+    maxUsers: 2,
+    maxCustomers: 100,
+    maxBookingsPerMonth: 10,
+    features: {
+      advancedReports: false,
+      accountSplitting: false,
+      apiAccess: false,
+      prioritySupport: false
+    }
+  };
+  if (!value) return base;
+  try {
+    const parsed = JSON.parse(value) as any;
+    if (parsed && typeof parsed === "object") {
+      return {
+        maxBranches: Number(parsed.maxBranches ?? base.maxBranches),
+        maxUsers: Number(parsed.maxUsers ?? base.maxUsers),
+        maxCustomers: Number(parsed.maxCustomers ?? base.maxCustomers),
+        maxBookingsPerMonth: Number(parsed.maxBookingsPerMonth ?? base.maxBookingsPerMonth),
+        features: {
+          advancedReports: Boolean(parsed.features?.advancedReports ?? base.features.advancedReports),
+          accountSplitting: Boolean(parsed.features?.accountSplitting ?? base.features.accountSplitting),
+          apiAccess: Boolean(parsed.features?.apiAccess ?? base.features.apiAccess),
+          prioritySupport: Boolean(parsed.features?.prioritySupport ?? base.features.prioritySupport)
+        }
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return base;
+}
+
+function serializePlanLimits(planForm: typeof emptyPlanForm) {
+  return JSON.stringify({
+    maxBranches: Number(planForm.maxBranches),
+    maxUsers: Number(planForm.maxUsers),
+    maxCustomers: Number(planForm.maxCustomers),
+    maxBookingsPerMonth: Number(planForm.maxBookingsPerMonth),
+    features: {
+      advancedReports: planForm.featureAdvancedReports,
+      accountSplitting: planForm.featureAccountSplitting,
+      apiAccess: planForm.featureApiAccess,
+      prioritySupport: planForm.featurePrioritySupport
+    }
+  });
 }
 
 function CompanyModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {

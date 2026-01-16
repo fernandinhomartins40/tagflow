@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { companies, companySubscriptions, plans, branches, users, customers, bookings } from "../schema";
-import { eq, and, count } from "drizzle-orm";
+import { companies, plans, branches, users, customers, bookings } from "../schema";
+import { eq, and, count, gte } from "drizzle-orm";
 
 export interface PlanLimits {
   maxBranches: number;
@@ -15,7 +15,7 @@ export interface PlanLimits {
   };
 }
 
-const PLAN_LIMITS: Record<string, PlanLimits> = {
+const DEFAULT_LIMITS: Record<string, PlanLimits> = {
   Free: {
     maxBranches: 1,
     maxUsers: 2,
@@ -54,8 +54,34 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
   }
 };
 
-export const getPlanLimits = (planName: string): PlanLimits => {
-  return PLAN_LIMITS[planName] ?? PLAN_LIMITS.Free;
+const parsePlanLimits = (limits?: string | null, planName?: string): PlanLimits => {
+  if (limits) {
+    try {
+      const parsed = JSON.parse(limits) as Partial<PlanLimits> & { features?: Partial<PlanLimits["features"]> };
+      if (parsed && typeof parsed === "object") {
+        const base = DEFAULT_LIMITS[planName ?? "Free"] ?? DEFAULT_LIMITS.Free;
+        return {
+          maxBranches: Number(parsed.maxBranches ?? base.maxBranches),
+          maxUsers: Number(parsed.maxUsers ?? base.maxUsers),
+          maxCustomers: Number(parsed.maxCustomers ?? base.maxCustomers),
+          maxBookingsPerMonth: Number(parsed.maxBookingsPerMonth ?? base.maxBookingsPerMonth),
+          features: {
+            advancedReports: Boolean(parsed.features?.advancedReports ?? base.features.advancedReports),
+            accountSplitting: Boolean(parsed.features?.accountSplitting ?? base.features.accountSplitting),
+            apiAccess: Boolean(parsed.features?.apiAccess ?? base.features.apiAccess),
+            prioritySupport: Boolean(parsed.features?.prioritySupport ?? base.features.prioritySupport)
+          }
+        };
+      }
+    } catch {
+      // ignore and fallback
+    }
+  }
+  return DEFAULT_LIMITS[planName ?? "Free"] ?? DEFAULT_LIMITS.Free;
+};
+
+export const getPlanLimits = (planName: string, limits?: string | null): PlanLimits => {
+  return parsePlanLimits(limits, planName);
 };
 
 export const getCompanyPlanLimits = async (companyId: string): Promise<PlanLimits> => {
@@ -63,7 +89,8 @@ export const getCompanyPlanLimits = async (companyId: string): Promise<PlanLimit
   if (!company) {
     throw new Error("Company not found");
   }
-  return getPlanLimits(company.plan);
+  const [plan] = await db.select().from(plans).where(eq(plans.name, company.plan));
+  return getPlanLimits(company.plan, plan?.limits);
 };
 
 export const checkBranchLimit = async (companyId: string): Promise<{ allowed: boolean; current: number; max: number }> => {
@@ -123,7 +150,7 @@ export const checkBookingLimit = async (companyId: string): Promise<{ allowed: b
     .from(bookings)
     .where(and(
       eq(bookings.companyId, companyId),
-      // Note: This is a simplified check. In production, you'd use proper date comparison
+      gte(bookings.createdAt, firstDayOfMonth)
     ));
 
   const current = result?.count ?? 0;
