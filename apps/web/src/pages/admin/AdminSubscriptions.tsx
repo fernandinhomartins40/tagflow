@@ -73,25 +73,25 @@ export function AdminSubscriptions() {
   return (
     <section className="space-y-6">
       <header>
-        <h2 className="text-3xl font-bold text-slate-900">Planos e Assinaturas</h2>
-        <p className="mt-1 text-slate-600">Escolha o plano ideal para o seu negócio</p>
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Planos e Assinaturas</h2>
+        <p className="mt-1 text-slate-600 dark:text-slate-400">Escolha o plano ideal para o seu negócio</p>
       </header>
 
-      <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-orange-50 to-amber-50 p-6">
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-orange-50 to-amber-50 p-6 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-600">Seu Plano Atual</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{companyPlan}</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Seu Plano Atual</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{companyPlan}</p>
             {plansQuery.data?.subscription?.status ? (
-              <p className="mt-1 text-sm text-slate-500">
-                Status: <span className="font-medium capitalize">{plansQuery.data.subscription.status}</span>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Status: <span className="font-medium capitalize text-slate-700 dark:text-slate-200">{plansQuery.data.subscription.status}</span>
               </p>
             ) : null}
           </div>
           {companyPlan === "Free" ? (
-            <div className="rounded-lg bg-orange-100 px-4 py-2 text-center">
+            <div className="rounded-lg bg-orange-100 px-4 py-2 text-center dark:bg-orange-500/10">
               <p className="text-xs font-semibold text-orange-700">Faça upgrade</p>
-              <p className="text-xs text-orange-600">Desbloqueie mais recursos</p>
+              <p className="text-xs text-orange-600 dark:text-orange-300">Desbloqueie mais recursos</p>
             </div>
           ) : null}
         </div>
@@ -113,10 +113,10 @@ export function AdminSubscriptions() {
               key={plan.id}
               className={`relative flex flex-col rounded-2xl border-2 p-6 transition-all ${
                 isPrime
-                  ? "border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg"
+                  ? "border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg dark:border-orange-400/60 dark:from-slate-900 dark:to-slate-800"
                   : isCurrent
-                    ? "border-orange-300 bg-white shadow-md"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
+                    ? "border-orange-300 bg-white shadow-md dark:border-orange-400/40 dark:bg-slate-900"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
               }`}
             >
               {isPrime ? (
@@ -132,23 +132,23 @@ export function AdminSubscriptions() {
               ) : null}
 
               <div className="mb-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-orange-600">{plan.name}</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-orange-600 dark:text-orange-300">{plan.name}</h3>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-slate-900">
+                  <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">
                     {price > 0 ? `R$ ${price.toFixed(0)}` : "Grátis"}
                   </span>
-                  {price > 0 ? <span className="text-slate-500">/mês</span> : null}
+                  {price > 0 ? <span className="text-slate-500 dark:text-slate-400">/mês</span> : null}
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{plan.description}</p>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{plan.description}</p>
               </div>
 
               <div className="mb-6 space-y-4">
                 {features.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Recursos</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Recursos</p>
                     <ul className="space-y-2">
                       {features.map((item) => (
-                        <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
+                        <li key={item} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
                           <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -161,10 +161,10 @@ export function AdminSubscriptions() {
 
                 {tools.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Ferramentas</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Ferramentas</p>
                     <ul className="space-y-2">
                       {tools.map((item) => (
-                        <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
+                        <li key={item} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
                           <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -177,10 +177,10 @@ export function AdminSubscriptions() {
 
                 {limits.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Limites</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Limites</p>
                     <ul className="space-y-2">
                       {limits.map((item) => (
-                        <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                        <li key={item} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
                           <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                           </svg>
@@ -222,9 +222,9 @@ export function AdminSubscriptions() {
       </div>
 
       {companyPlan === "Free" ? (
-        <div className="rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 p-6 text-center">
-          <h3 className="text-lg font-bold text-slate-900">Pronto para crescer?</h3>
-          <p className="mt-2 text-sm text-slate-600">
+        <div className="rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 p-6 text-center dark:border-orange-400/40 dark:bg-orange-500/10">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Pronto para crescer?</h3>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Faça upgrade para desbloquear recursos avançados, mais limites e suporte prioritário.
           </p>
         </div>
@@ -265,3 +265,4 @@ function buildPlanFeatures(plan: { features?: string | null; tools?: string | nu
   const features = [...parsePlanList(plan.features), ...parsePlanList(plan.tools), ...parsePlanList(plan.limits)];
   return features.length ? features.slice(0, 6) : [];
 }
+
