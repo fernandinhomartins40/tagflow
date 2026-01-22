@@ -321,96 +321,96 @@ jobs:
 
             # Always update nginx config with SSL (whether cert was just installed or already existed)
             echo "Configuring nginx with SSL..."
-              if [ -f "$NGINX_CONF" ]; then
-                cp "$NGINX_CONF" "$NGINX_BACKUP"
+            if [ -f "$NGINX_CONF" ]; then
+              cp "$NGINX_CONF" "$NGINX_BACKUP"
+            fi
+            cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name tagflow.shop www.tagflow.shop;
+                return 301 https://\$server_name\$request_uri;
+            }
+
+            server {
+                listen 443 ssl http2;
+                listen [::]:443 ssl http2;
+                server_name tagflow.shop www.tagflow.shop;
+
+                ssl_certificate /etc/letsencrypt/live/tagflow.shop/fullchain.pem;
+                ssl_certificate_key /etc/letsencrypt/live/tagflow.shop/privkey.pem;
+                ssl_protocols TLSv1.2 TLSv1.3;
+                ssl_ciphers HIGH:!aNULL:!MD5;
+                ssl_prefer_server_ciphers on;
+
+                access_log /var/log/nginx/tagflow-access.log;
+                error_log /var/log/nginx/tagflow-error.log;
+
+                client_max_body_size 50M;
+
+                location /api/ {
+                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+
+                location /health {
+                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host \$host;
+                }
+
+                location / {
+                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+            }
+            NGINX_EOF
+
+            # Test nginx config before starting
+            if ! nginx -t; then
+              echo "Nginx config test failed"
+              if [ -f "$NGINX_BACKUP" ]; then
+                cp "$NGINX_BACKUP" "$NGINX_CONF"
+                nginx -t && systemctl reload nginx || true
               fi
-              cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
-              server {
-                  listen 80;
-                  listen [::]:80;
-                  server_name tagflow.shop www.tagflow.shop;
-                  return 301 https://\$server_name\$request_uri;
-              }
+              exit 1
+            fi
 
-              server {
-                  listen 443 ssl http2;
-                  listen [::]:443 ssl http2;
-                  server_name tagflow.shop www.tagflow.shop;
+            # Start nginx with new SSL config
+            systemctl start nginx
+            sleep 2
 
-                  ssl_certificate /etc/letsencrypt/live/tagflow.shop/fullchain.pem;
-                  ssl_certificate_key /etc/letsencrypt/live/tagflow.shop/privkey.pem;
-                  ssl_protocols TLSv1.2 TLSv1.3;
-                  ssl_ciphers HIGH:!aNULL:!MD5;
-                  ssl_prefer_server_ciphers on;
+            # Verify nginx started successfully
+            if ! systemctl is-active --quiet nginx; then
+              echo "Nginx failed to start with SSL config"
+              systemctl status nginx
+              journalctl -u nginx -n 50
+              exit 1
+            fi
 
-                  access_log /var/log/nginx/tagflow-access.log;
-                  error_log /var/log/nginx/tagflow-error.log;
+            # Verify SSL is working
+            echo "Testing SSL certificate..."
+            if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
+              echo "HTTPS is responding"
+            else
+              echo "HTTPS is not responding"
+              exit 1
+            fi
 
-                  client_max_body_size 50M;
-
-                  location /api/ {
-                      proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
-                      proxy_http_version 1.1;
-                      proxy_set_header Upgrade \$http_upgrade;
-                      proxy_set_header Connection "upgrade";
-                      proxy_set_header Host \$host;
-                      proxy_set_header X-Real-IP \$remote_addr;
-                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto \$scheme;
-                  }
-
-                  location /health {
-                      proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
-                      proxy_http_version 1.1;
-                      proxy_set_header Host \$host;
-                  }
-
-                  location / {
-                      proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
-                      proxy_http_version 1.1;
-                      proxy_set_header Upgrade \$http_upgrade;
-                      proxy_set_header Connection "upgrade";
-                      proxy_set_header Host \$host;
-                      proxy_cache_bypass \$http_upgrade;
-                      proxy_set_header X-Real-IP \$remote_addr;
-                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto \$scheme;
-                  }
-              }
-              NGINX_EOF
-
-              # Test nginx config before starting
-              if ! nginx -t; then
-                echo "Nginx config test failed"
-                if [ -f "$NGINX_BACKUP" ]; then
-                  cp "$NGINX_BACKUP" "$NGINX_CONF"
-                  nginx -t && systemctl reload nginx || true
-                fi
-                exit 1
-              fi
-
-              # Start nginx with new SSL config
-              systemctl start nginx
-              sleep 2
-
-              # Verify nginx started successfully
-              if ! systemctl is-active --quiet nginx; then
-                echo "Nginx failed to start with SSL config"
-                systemctl status nginx
-                journalctl -u nginx -n 50
-                exit 1
-              fi
-
-              # Verify SSL is working
-              echo "Testing SSL certificate..."
-              if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
-                echo "HTTPS is responding"
-              else
-                echo "HTTPS is not responding"
-                exit 1
-              fi
-
-              echo "Nginx restarted with SSL configuration"
+            echo "Nginx restarted with SSL configuration"
 
             echo "Aguardando inicializacao..."
             sleep 15
