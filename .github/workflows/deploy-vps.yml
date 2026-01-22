@@ -1,4 +1,4 @@
-name: Deploy Tagflow to VPS
+﻿name: Deploy Tagflow to VPS
 
 on:
   push:
@@ -120,7 +120,7 @@ jobs:
             done
 
             if [ -z "$DB_CONTAINER" ]; then
-              echo "Container do banco não encontrado."
+              echo "Container do banco nÃ£o encontrado."
               docker-compose -f docker-compose.vps.yml ps
               exit 1
             fi
@@ -134,7 +134,7 @@ jobs:
             done
 
             if ! docker exec -i "$DB_CONTAINER" pg_isready -U tagflow -d tagflow >/dev/null 2>&1; then
-              echo "Banco não ficou pronto a tempo."
+              echo "Banco nÃ£o ficou pronto a tempo."
               docker logs "$DB_CONTAINER" --tail=200 || true
               exit 1
             fi
@@ -199,6 +199,11 @@ jobs:
             fi
 
             # Create initial HTTP-only nginx config
+            NGINX_CONF="/etc/nginx/conf.d/tagflow.conf"
+            NGINX_BACKUP="/etc/nginx/conf.d/tagflow.conf.bak"
+            if [ -f "$NGINX_CONF" ]; then
+              cp "$NGINX_CONF" "$NGINX_BACKUP"
+            fi
             cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
             server {
                 listen 80;
@@ -213,30 +218,30 @@ jobs:
                 location /api/ {
                     proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Upgrade \$http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
                 }
 
                 location /health {
                     proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
                     proxy_http_version 1.1;
-                    proxy_set_header Host $host;
+                    proxy_set_header Host \$host;
                 }
 
                 location / {
                     proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Upgrade \$http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host $host;
-                    proxy_cache_bypass $http_upgrade;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
                 }
             }
             NGINX_EOF
@@ -245,20 +250,25 @@ jobs:
             rm -f /etc/nginx/sites-enabled/tagflow.conf
             rm -f /etc/nginx/sites-enabled/default
 
-            # Test and reload nginx (ignore errors from other sites)
-            if nginx -t 2>&1 | grep -q "test failed"; then
-              echo "Warning: nginx test failed, but continuing (likely due to other sites SSL issues)"
+            # Test and reload nginx
+            if ! nginx -t; then
+              echo "❌ Nginx config test failed"
+              if [ -f "$NGINX_BACKUP" ]; then
+                cp "$NGINX_BACKUP" "$NGINX_CONF"
+                nginx -t && systemctl reload nginx || true
+              fi
+              exit 1
             fi
-            systemctl reload nginx || echo "Warning: nginx reload had issues"
+            systemctl reload nginx
 
             # Check if SSL certificate exists and is valid
             CERT_EXISTS=false
             if [ -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
               if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
-                echo "✅ Valid SSL certificate found for tagflow.shop"
+                echo "âœ… Valid SSL certificate found for tagflow.shop"
                 CERT_EXISTS=true
               else
-                echo "⚠️  Certificate exists but is not for tagflow.shop, removing..."
+                echo "âš ï¸  Certificate exists but is not for tagflow.shop, removing..."
                 rm -rf /etc/letsencrypt/live/tagflow.shop
                 rm -rf /etc/letsencrypt/archive/tagflow.shop
                 rm -f /etc/letsencrypt/renewal/tagflow.shop.conf
@@ -275,7 +285,7 @@ jobs:
 
               # Verify port 80 is free
               if netstat -tlnp | grep ':80 '; then
-                echo "❌ Port 80 is still in use!"
+                echo "âŒ Port 80 is still in use!"
                 netstat -tlnp | grep ':80 '
                 systemctl start nginx
                 exit 1
@@ -289,9 +299,9 @@ jobs:
                 --agree-tos \
                 --email admin@tagflow.shop \
                 --cert-name tagflow.shop; then
-                echo "✅ SSL certificate installed successfully"
+                echo "âœ… SSL certificate installed successfully"
               else
-                echo "❌ Failed to install SSL certificate"
+                echo "âŒ Failed to install SSL certificate"
                 cat /var/log/letsencrypt/letsencrypt.log | tail -50
                 systemctl start nginx
                 exit 1
@@ -299,7 +309,7 @@ jobs:
 
               # Verify certificate was created
               if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
-                echo "❌ Certificate file not found after certbot"
+                echo "âŒ Certificate file not found after certbot"
                 ls -la /etc/letsencrypt/live/ || true
                 systemctl start nginx
                 exit 1
@@ -308,12 +318,15 @@ jobs:
 
             # Always update nginx config with SSL (whether cert was just installed or already existed)
             echo "Configuring nginx with SSL..."
+              if [ -f "$NGINX_CONF" ]; then
+                cp "$NGINX_CONF" "$NGINX_BACKUP"
+              fi
               cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
               server {
                   listen 80;
                   listen [::]:80;
                   server_name tagflow.shop www.tagflow.shop;
-                  return 301 https://$host$request_uri;
+                  return 301 https://\$server_name\$request_uri;
               }
 
               server {
@@ -335,37 +348,41 @@ jobs:
                   location /api/ {
                       proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
                       proxy_http_version 1.1;
-                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Upgrade \$http_upgrade;
                       proxy_set_header Connection "upgrade";
-                      proxy_set_header Host $host;
-                      proxy_set_header X-Real-IP $remote_addr;
-                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto $scheme;
+                      proxy_set_header Host \$host;
+                      proxy_set_header X-Real-IP \$remote_addr;
+                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto \$scheme;
                   }
 
                   location /health {
                       proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
                       proxy_http_version 1.1;
-                      proxy_set_header Host $host;
+                      proxy_set_header Host \$host;
                   }
 
                   location / {
                       proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
                       proxy_http_version 1.1;
-                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Upgrade \$http_upgrade;
                       proxy_set_header Connection "upgrade";
-                      proxy_set_header Host $host;
-                      proxy_cache_bypass $http_upgrade;
-                      proxy_set_header X-Real-IP $remote_addr;
-                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto $scheme;
+                      proxy_set_header Host \$host;
+                      proxy_cache_bypass \$http_upgrade;
+                      proxy_set_header X-Real-IP \$remote_addr;
+                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto \$scheme;
                   }
               }
               NGINX_EOF
 
               # Test nginx config before starting
               if ! nginx -t; then
-                echo "❌ Nginx config test failed"
+                echo "âŒ Nginx config test failed"
+                if [ -f "$NGINX_BACKUP" ]; then
+                  cp "$NGINX_BACKUP" "$NGINX_CONF"
+                  nginx -t && systemctl reload nginx || true
+                fi
                 exit 1
               fi
 
@@ -375,7 +392,7 @@ jobs:
 
               # Verify nginx started successfully
               if ! systemctl is-active --quiet nginx; then
-                echo "❌ Nginx failed to start with SSL config"
+                echo "âŒ Nginx failed to start with SSL config"
                 systemctl status nginx
                 journalctl -u nginx -n 50
                 exit 1
@@ -384,15 +401,15 @@ jobs:
               # Verify SSL is working
               echo "Testing SSL certificate..."
               if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
-                echo "✅ HTTPS is responding"
+                echo "âœ… HTTPS is responding"
               else
-                echo "❌ HTTPS is not responding"
+                echo "âŒ HTTPS is not responding"
                 exit 1
               fi
 
-              echo "✅ Nginx restarted with SSL configuration"
+              echo "âœ… Nginx restarted with SSL configuration"
 
-            echo "Aguardando inicialização..."
+            echo "Aguardando inicializaÃ§Ã£o..."
             sleep 15
 
             if ! curl -f http://localhost:3180/health >/dev/null 2>&1; then
@@ -404,8 +421,9 @@ jobs:
       - name: Verify Deployment
         if: success()
         run: |
-          echo "✅ Deploy concluído com sucesso!"
-          echo "🌐 Tagflow disponível em:"
+          echo "âœ… Deploy concluÃ­do com sucesso!"
+          echo "ðŸŒ Tagflow disponÃ­vel em:"
           echo "   - https://tagflow.shop"
           echo "   - https://www.tagflow.shop"
-          echo "📊 Health check: https://tagflow.shop/health"
+          echo "ðŸ“Š Health check: https://tagflow.shop/health"
+
