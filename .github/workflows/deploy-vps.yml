@@ -115,12 +115,12 @@ jobs:
               if [ -n "$DB_CONTAINER" ]; then
                 break
               fi
-              echo "Aguardando container do banco..."
+              echo "Container do banco nao encontrado."
               sleep 2
             done
 
             if [ -z "$DB_CONTAINER" ]; then
-              echo "Container do banco nÃ£o encontrado."
+              echo "Container do banco nao encontrado."
               docker-compose -f docker-compose.vps.yml ps
               exit 1
             fi
@@ -129,12 +129,12 @@ jobs:
               if docker exec -i "$DB_CONTAINER" pg_isready -U tagflow -d tagflow >/dev/null 2>&1; then
                 break
               fi
-              echo "Aguardando banco ficar pronto..."
+              echo "Banco nao ficou pronto a tempo."
               sleep 2
             done
 
             if ! docker exec -i "$DB_CONTAINER" pg_isready -U tagflow -d tagflow >/dev/null 2>&1; then
-              echo "Banco nÃ£o ficou pronto a tempo."
+              echo "Banco nao ficou pronto a tempo."
               docker logs "$DB_CONTAINER" --tail=200 || true
               exit 1
             fi
@@ -252,7 +252,7 @@ jobs:
 
             # Test and reload nginx
             if ! nginx -t; then
-              echo "❌ Nginx config test failed"
+                echo "Nginx config test failed"
               if [ -f "$NGINX_BACKUP" ]; then
                 cp "$NGINX_BACKUP" "$NGINX_CONF"
                 nginx -t && systemctl reload nginx || true
@@ -265,10 +265,10 @@ jobs:
             CERT_EXISTS=false
             if [ -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
               if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
-                echo "âœ… Valid SSL certificate found for tagflow.shop"
+                echo "Valid SSL certificate found for tagflow.shop"
                 CERT_EXISTS=true
               else
-                echo "âš ï¸  Certificate exists but is not for tagflow.shop, removing..."
+                echo "Certificate exists but is not for tagflow.shop, removing..."
                 rm -rf /etc/letsencrypt/live/tagflow.shop
                 rm -rf /etc/letsencrypt/archive/tagflow.shop
                 rm -f /etc/letsencrypt/renewal/tagflow.shop.conf
@@ -285,7 +285,7 @@ jobs:
 
               # Verify port 80 is free
               if netstat -tlnp | grep ':80 '; then
-                echo "âŒ Port 80 is still in use!"
+                echo "Port 80 is still in use!"
                 netstat -tlnp | grep ':80 '
                 systemctl start nginx
                 exit 1
@@ -299,9 +299,9 @@ jobs:
                 --agree-tos \
                 --email admin@tagflow.shop \
                 --cert-name tagflow.shop; then
-                echo "âœ… SSL certificate installed successfully"
+                echo "SSL certificate installed successfully"
               else
-                echo "âŒ Failed to install SSL certificate"
+                echo "Failed to install SSL certificate"
                 cat /var/log/letsencrypt/letsencrypt.log | tail -50
                 systemctl start nginx
                 exit 1
@@ -309,7 +309,7 @@ jobs:
 
               # Verify certificate was created
               if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
-                echo "âŒ Certificate file not found after certbot"
+                echo "Certificate file not found after certbot"
                 ls -la /etc/letsencrypt/live/ || true
                 systemctl start nginx
                 exit 1
@@ -378,7 +378,7 @@ jobs:
 
               # Test nginx config before starting
               if ! nginx -t; then
-                echo "âŒ Nginx config test failed"
+                echo "Nginx config test failed"
                 if [ -f "$NGINX_BACKUP" ]; then
                   cp "$NGINX_BACKUP" "$NGINX_CONF"
                   nginx -t && systemctl reload nginx || true
@@ -392,7 +392,7 @@ jobs:
 
               # Verify nginx started successfully
               if ! systemctl is-active --quiet nginx; then
-                echo "âŒ Nginx failed to start with SSL config"
+                echo "Nginx failed to start with SSL config"
                 systemctl status nginx
                 journalctl -u nginx -n 50
                 exit 1
@@ -401,15 +401,15 @@ jobs:
               # Verify SSL is working
               echo "Testing SSL certificate..."
               if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
-                echo "âœ… HTTPS is responding"
+                echo "HTTPS is responding"
               else
-                echo "âŒ HTTPS is not responding"
+                echo "HTTPS is not responding"
                 exit 1
               fi
 
-              echo "âœ… Nginx restarted with SSL configuration"
+              echo "Nginx restarted with SSL configuration"
 
-            echo "Aguardando inicializaÃ§Ã£o..."
+            echo "Aguardando inicializacao..."
             sleep 15
 
             if ! curl -f http://localhost:3180/health >/dev/null 2>&1; then
@@ -421,9 +421,9 @@ jobs:
       - name: Verify Deployment
         if: success()
         run: |
-          echo "âœ… Deploy concluÃ­do com sucesso!"
-          echo "ðŸŒ Tagflow disponÃ­vel em:"
+          echo "Deploy concluido com sucesso!"
+          echo "Tagflow disponivel em:"
           echo "   - https://tagflow.shop"
           echo "   - https://www.tagflow.shop"
-          echo "ðŸ“Š Health check: https://tagflow.shop/health"
+          echo "Health check: https://tagflow.shop/health"
 
