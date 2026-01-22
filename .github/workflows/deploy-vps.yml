@@ -1,4 +1,4 @@
-﻿name: Deploy Tagflow to VPS
+name: Deploy Tagflow to VPS
 
 on:
   push:
