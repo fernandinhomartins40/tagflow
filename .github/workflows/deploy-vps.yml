@@ -69,6 +69,7 @@ jobs:
             EXISTING_VAPID_PUBLIC_KEY=""
             EXISTING_VAPID_PRIVATE_KEY=""
             EXISTING_VAPID_SUBJECT=""
+            EXISTING_EXTERNAL_PORT=""
 
             if [ -f .env ]; then
               EXISTING_JWT_SECRET=$(grep -E '^JWT_SECRET=' .env | head -1 | cut -d '=' -f2- || true)
@@ -78,6 +79,7 @@ jobs:
               EXISTING_VAPID_PUBLIC_KEY=$(grep -E '^VAPID_PUBLIC_KEY=' .env | head -1 | cut -d '=' -f2- || true)
               EXISTING_VAPID_PRIVATE_KEY=$(grep -E '^VAPID_PRIVATE_KEY=' .env | head -1 | cut -d '=' -f2- || true)
               EXISTING_VAPID_SUBJECT=$(grep -E '^VAPID_SUBJECT=' .env | head -1 | cut -d '=' -f2- || true)
+              EXISTING_EXTERNAL_PORT=$(grep -E '^EXTERNAL_PORT=' .env | head -1 | cut -d '=' -f2- || true)
             fi
 
             JWT_SECRET="${EXISTING_JWT_SECRET:-tagflow-prod-$(date +%s)-$(openssl rand -hex 16)}"
@@ -87,9 +89,10 @@ jobs:
             VAPID_PUBLIC_KEY="${EXISTING_VAPID_PUBLIC_KEY:-replace_me}"
             VAPID_PRIVATE_KEY="${EXISTING_VAPID_PRIVATE_KEY:-replace_me}"
             VAPID_SUBJECT="${EXISTING_VAPID_SUBJECT:-mailto:admin@tagflow.shop}"
+            EXTERNAL_PORT="${EXISTING_EXTERNAL_PORT:-3180}"
 
             cat > .env << EOF
-            EXTERNAL_PORT=3180
+            EXTERNAL_PORT=${EXTERNAL_PORT}
             POSTGRES_USER=tagflow
             POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             POSTGRES_DB=tagflow
@@ -193,7 +196,7 @@ jobs:
             fi
             if [ -z "$UPSTREAM_IP" ]; then
               UPSTREAM_IP="127.0.0.1"
-              UPSTREAM_PORT="3180"
+              UPSTREAM_PORT="${EXTERNAL_PORT}"
             else
               UPSTREAM_PORT="80"
             fi
