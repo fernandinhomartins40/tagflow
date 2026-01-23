@@ -202,12 +202,13 @@ jobs:
             fi
 
             # Create initial HTTP-only nginx config
-            NGINX_CONF="/etc/nginx/conf.d/tagflow.conf"
-            NGINX_BACKUP="/etc/nginx/conf.d/tagflow.conf.bak"
+            # Use sites-available/enabled pattern to avoid conflicts with other apps
+            NGINX_CONF="/etc/nginx/sites-available/tagflow.conf"
+            NGINX_BACKUP="/etc/nginx/sites-available/tagflow.conf.bak"
             if [ -f "$NGINX_CONF" ]; then
               cp "$NGINX_CONF" "$NGINX_BACKUP"
             fi
-            cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
+            cat > /etc/nginx/sites-available/tagflow.conf << NGINX_EOF
             server {
                 listen 80;
                 listen [::]:80;
@@ -249,9 +250,11 @@ jobs:
             }
             NGINX_EOF
 
-            # Remove conflicting configs
-            rm -f /etc/nginx/sites-enabled/tagflow.conf
+            # Remove conflicting configs and enable tagflow
             rm -f /etc/nginx/sites-enabled/default
+            rm -f /etc/nginx/sites-enabled/*.disabled
+            rm -f /etc/nginx/conf.d/tagflow.conf*
+            ln -sf /etc/nginx/sites-available/tagflow.conf /etc/nginx/sites-enabled/tagflow.conf
 
             # Test and reload nginx
             if ! nginx -t; then
@@ -324,7 +327,7 @@ jobs:
             if [ -f "$NGINX_CONF" ]; then
               cp "$NGINX_CONF" "$NGINX_BACKUP"
             fi
-            cat > /etc/nginx/conf.d/tagflow.conf << NGINX_EOF
+            cat > /etc/nginx/sites-available/tagflow.conf << NGINX_EOF
             server {
                 listen 80;
                 listen [::]:80;
