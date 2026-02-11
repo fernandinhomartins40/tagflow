@@ -17,6 +17,17 @@ export function AdminSettings() {
   const user = useAuthStore((state) => state.user);
   const push = usePushNotifications();
   const [permission, setPermission] = useState<NotificationPermission | "unknown">("unknown");
+  const isIos =
+    typeof window !== "undefined" &&
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone);
+  const swSupported = typeof window !== "undefined" && "serviceWorker" in navigator;
+  const hasVapid = Boolean(import.meta.env.VITE_VAPID_PUBLIC_KEY);
 
   const companyQuery = useQuery({
     queryKey: ["companies", "me"],
@@ -50,6 +61,17 @@ export function AdminSettings() {
 
   const canSendTest = push.status === "inscrito";
   const isSubscribed = push.status === "inscrito";
+  const canSubscribe = swSupported && hasVapid && (!isIos || isStandalone);
+  const needsPermission = permission === "default";
+
+  const requestPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setPermission(result);
+    await push.checkStatus();
+  };
 
   return (
     <section className="space-y-6">
@@ -109,16 +131,31 @@ export function AdminSettings() {
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-neutral-400">Ambiente</p>
-            <p className="mt-1 font-semibold">{import.meta.env.VITE_VAPID_PUBLIC_KEY ? "VAPID ok" : "Sem VAPID"}</p>
+            <p className="mt-1 font-semibold">{hasVapid ? "VAPID ok" : "Sem VAPID"}</p>
           </div>
         </div>
+        {isIos && !isStandalone ? (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
+            No iOS, notificacoes push so funcionam quando o app esta instalado na Tela de Inicio.
+          </div>
+        ) : null}
+        {!hasVapid ? (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200">
+            Configure as chaves VAPID no servidor e no frontend para ativar as notificacoes.
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
+          {needsPermission ? (
+            <Button variant="outline" onClick={requestPermission}>
+              Solicitar permissao
+            </Button>
+          ) : null}
           {isSubscribed ? (
             <Button variant="outline" onClick={() => push.unsubscribe()}>
               Desativar notificacoes
             </Button>
           ) : (
-            <Button onClick={() => push.subscribe()}>
+            <Button onClick={() => push.subscribe()} disabled={!canSubscribe}>
               Ativar notificacoes
             </Button>
           )}

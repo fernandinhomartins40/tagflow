@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
-import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { formatCurrencyValue } from "../../utils/currency";
 
 interface SalesReport {
@@ -58,8 +57,6 @@ export function AdminDashboard() {
     queryFn: () =>
       apiFetch<{ data: Array<{ id: string; name: string; branchId?: string | null }> }>("/api/locations?page=1&pageSize=200")
   });
-
-  const push = usePushNotifications();
 
   const totalValue = Number(salesQuery.data?.total ?? 0);
   const countValue = Number(salesQuery.data?.count ?? 0);
@@ -134,13 +131,6 @@ export function AdminDashboard() {
           >
             Personalizado
           </Button>
-          <Button variant="outline" onClick={() => push.subscribe()}>
-            Ativar push
-          </Button>
-          <Button variant="outline" onClick={() => push.sendTest()}>
-            Enviar teste
-          </Button>
-          <span className="text-xs text-white/80">Push: {push.status}</span>
         </div>
       </div>
 

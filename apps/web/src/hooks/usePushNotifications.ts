@@ -67,15 +67,31 @@ export function usePushNotifications() {
     }
 
     const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      const payload = extractPayload(existing);
+      if (payload) {
+        await apiFetch("/api/notifications/subscribe", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+      }
+      setStatus("inscrito");
+      return;
+    }
+
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
     });
 
-    await apiFetch("/api/notifications/subscribe", {
-      method: "POST",
-      body: JSON.stringify(subscription)
-    });
+    const payload = extractPayload(subscription);
+    if (payload) {
+      await apiFetch("/api/notifications/subscribe", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
 
     setStatus("inscrito");
   };
