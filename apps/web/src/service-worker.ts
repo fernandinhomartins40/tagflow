@@ -6,7 +6,7 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
@@ -44,8 +44,9 @@ registerRoute(
 
 registerRoute(
   ({ request }) => request.destination === "script" || request.destination === "style",
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: `asset-cache-${CACHE_VERSION}`,
+    networkTimeoutSeconds: 3,
     plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 })]
   })
 );

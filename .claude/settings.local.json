@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@tagflow.shop \"hostname && pwd && ls -la\")",
+      "Bash(ssh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh run list:*)",
+      "Bash(cd c:Projetos Cursortagflow)",
+      "Bash(curl:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(cd:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(git reset:*)",
+      "Bash(bun run typecheck:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(bun add:*)",
+      "Bash(bun run build:*)"
+    ]
+  }
+}
