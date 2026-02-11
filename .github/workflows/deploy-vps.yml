@@ -107,11 +107,23 @@ jobs:
             VAPID_SUBJECT=${VAPID_SUBJECT}
             STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
             STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+            BUILD_DATE=\$(date +%Y%m%d%H%M%S)
             EOF
 
+            # Parar e remover containers antigos preservando volumes
             docker-compose -f docker-compose.vps.yml down --remove-orphans || true
+
+            # Remover imagens antigas do web e api para forçar rebuild completo
+            docker rmi tagflow-web tagflow-api 2>/dev/null || true
+
+            # Limpar imagens dangling (sem tag)
+            docker image prune -f || true
+
+            # Build completo sem cache
             docker-compose -f docker-compose.vps.yml build --no-cache --pull
-            docker-compose -f docker-compose.vps.yml up -d --remove-orphans
+
+            # Subir containers com força de recreação
+            docker-compose -f docker-compose.vps.yml up -d --force-recreate --remove-orphans
 
             for i in {1..30}; do
               DB_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q db || true)

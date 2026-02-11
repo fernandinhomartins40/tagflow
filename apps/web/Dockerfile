@@ -1,10 +1,14 @@
 FROM oven/bun:1.1.26 AS base
 WORKDIR /app
+
+# Força rebuild ao alterar o código (invalidação de cache)
+ARG BUILD_DATE
+ARG VITE_API_URL=http://localhost:8080
+ENV VITE_API_URL=$VITE_API_URL
+
 COPY package.json bun.lockb* ./
 RUN bun install
 COPY . .
-ARG VITE_API_URL=http://localhost:8080
-ENV VITE_API_URL=$VITE_API_URL
 RUN bun run build
 
 FROM nginx:alpine
