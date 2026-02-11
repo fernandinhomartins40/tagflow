@@ -62,7 +62,6 @@ superAdmin.route("/", superAdminRoutes);
 app.route("/api/superadmin", superAdmin);
 
 const secure = new Hono();
-secure.use("/*", tenantMiddleware);
 secure.use("/*", authMiddleware);
 secure.route("/companies", companiesRoutes);
 secure.route("/branches", branchesRoutes);
