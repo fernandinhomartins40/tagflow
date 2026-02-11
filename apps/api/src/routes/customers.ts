@@ -9,15 +9,15 @@ import { validateCustomerLimit } from "../utils/planValidation";
 import { hashCustomerPassword, initialCustomerPassword, normalizeCpf, normalizePhone } from "../utils/customer";
 
 const customerSchema = z.object({
-  branchId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional(),
   name: z.string().min(2),
   cpf: z.string().min(11),
-  birthDate: z.string().optional().nullable(),
+  birthDate: z.string().optional(),
   phone: z.string().min(8),
-  email: z.string().email().optional().nullable(),
-  credits: z.coerce.number().optional().nullable(),
-  creditLimit: z.coerce.number().optional().nullable(),
-  active: z.boolean().optional().nullable()
+  email: z.string().email().optional(),
+  credits: z.coerce.number().optional(),
+  creditLimit: z.coerce.number().optional(),
+  active: z.boolean().optional()
 });
 
 const identifierSchema = z.object({
