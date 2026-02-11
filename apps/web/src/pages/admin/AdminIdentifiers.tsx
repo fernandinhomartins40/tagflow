@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Nfc } from "lucide-react";
+import { Nfc, AlertCircle, CheckCircle2, Wifi } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { apiFetch } from "../../services/api";
-import { useNfcReader } from "../../hooks/useNfcReader";
+import { useNfc } from "../../hooks/useNfc";
 import { ScannerModal } from "../../components/ScannerModal";
 import { formatCurrencyInput, parseCurrencyInput } from "../../utils/currency";
 
@@ -34,8 +34,35 @@ export function AdminIdentifiers() {
   const [creditLimit, setCreditLimit] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
-  const nfc = useNfcReader();
+  const [writeMode, setWriteMode] = useState(false);
+  const [dataToWrite, setDataToWrite] = useState("");
   const lastAutoLinkRef = useRef<string | null>(null);
+
+  const nfc = useNfc({
+    onRead: (event) => {
+      console.log("NFC lido:", event);
+      // Se tem serial number, usa ele
+      if (event.serialNumber) {
+        setIdentifierCode(event.serialNumber);
+      } else if (event.records.length > 0) {
+        // Senão, usa o primeiro registro de texto
+        const textRecord = event.records.find(r => r.recordType === "text");
+        if (textRecord) {
+          setIdentifierCode(textRecord.data);
+        }
+      }
+    },
+    onWrite: () => {
+      console.log("NFC gravado com sucesso");
+      setWriteMode(false);
+      setDataToWrite("");
+      setError(null);
+    },
+    onError: (err) => {
+      console.error("Erro NFC:", err);
+      setError(err.message);
+    }
+  });
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
@@ -82,6 +109,19 @@ export function AdminIdentifiers() {
     }
   });
 
+  const handleWriteNfc = async () => {
+    if (!dataToWrite.trim()) {
+      setError("Informe os dados para gravar na tag NFC.");
+      return;
+    }
+
+    const success = await nfc.write(dataToWrite);
+    if (success) {
+      setError(null);
+      setSuccessOpen(true);
+    }
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!identifierCode.trim()) {
@@ -117,17 +157,16 @@ export function AdminIdentifiers() {
       setIdentifierCode("");
       setError(null);
       lastAutoLinkRef.current = null;
-      nfc.start();
+      nfc.startScan();
     } else {
-      nfc.stop();
+      nfc.stopScan();
     }
-  }, [identifierType, nfc]);
+  }, [identifierType]);
 
   useEffect(() => {
-    if (!nfc.data) return;
-    setIdentifierCode(nfc.data);
+    if (!identifierCode) return;
     if (identifierType !== "nfc") return;
-    if (lastAutoLinkRef.current === nfc.data) return;
+    if (lastAutoLinkRef.current === identifierCode) return;
     if (mode === "existing" && !selectedCustomerId) {
       setError("Selecione um cliente antes de aproximar o NFC.");
       return;
@@ -136,9 +175,9 @@ export function AdminIdentifiers() {
       setError("Informe o nome antes de aproximar o NFC.");
       return;
     }
-    lastAutoLinkRef.current = nfc.data;
+    lastAutoLinkRef.current = identifierCode;
     handleSubmit().catch(() => null);
-  }, [nfc.data]);
+  }, [identifierCode]);
 
   useEffect(() => {
     if (!successOpen) return;
@@ -223,41 +262,168 @@ export function AdminIdentifiers() {
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-2xl border border-brand-100 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Aguardando NFC</p>
-                  <p className="text-xs text-slate-500">Encoste a pulseira/cartao para ler automaticamente.</p>
+            {!nfc.isSupported ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-rose-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-rose-900">NFC não suportado</p>
+                    <p className="text-xs text-rose-700 mt-1">
+                      {nfc.error?.message || "Use Chrome, Edge ou Opera em um dispositivo Android com NFC."}
+                    </p>
+                  </div>
                 </div>
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200 opacity-70" />
-                  <Nfc className="relative h-5 w-5" />
-                </span>
               </div>
-              <div
-                className={`mt-3 rounded-xl border px-3 py-3 text-sm ${
-                  nfc.status === "lido"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : nfc.status === "detectado"
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : nfc.status.includes("erro")
-                        ? "border-rose-200 bg-rose-50 text-rose-600"
-                        : "border-dashed border-emerald-200 bg-white text-slate-600"
-                }`}
-              >
-                {nfc.status === "lido" && identifierCode
-                  ? `Leitura OK: ${identifierCode}`
-                  : nfc.status === "detectado"
-                    ? "NFC detectado, mas o identificador nao foi lido. Tente outro cartao."
-                    : nfc.status.includes("erro")
-                      ? "Falha ao ler NFC. Tente novamente."
-                      : "Aguardando leitura NFC..."}
+            ) : (
+              <div className="rounded-2xl border border-brand-100 bg-slate-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">
+                        {writeMode ? "Modo Gravação NFC" : "Modo Leitura NFC"}
+                      </p>
+                      {nfc.status === "scanning" && (
+                        <span className="text-xs text-emerald-600 flex items-center gap-1">
+                          <Wifi className="h-3 w-3" /> Ativo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {writeMode
+                        ? "Aproxime a tag NFC para gravar os dados."
+                        : "Aproxime a pulseira/cartão para ler automaticamente."}
+                    </p>
+                  </div>
+                  <span className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
+                    nfc.status === "read-success" || nfc.status === "write-success"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : nfc.status === "read-error" || nfc.status === "write-error"
+                        ? "bg-rose-100 text-rose-700"
+                        : nfc.status === "scanning" || nfc.status === "writing"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    {(nfc.status === "scanning" || nfc.status === "writing") && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200 opacity-70" />
+                    )}
+                    {nfc.status === "read-success" || nfc.status === "write-success" ? (
+                      <CheckCircle2 className="relative h-5 w-5" />
+                    ) : nfc.status === "read-error" || nfc.status === "write-error" ? (
+                      <AlertCircle className="relative h-5 w-5" />
+                    ) : (
+                      <Nfc className="relative h-5 w-5" />
+                    )}
+                  </span>
+                </div>
+
+                {/* Modo Escrita */}
+                {writeMode && (
+                  <div className="mt-3 space-y-2">
+                    <input
+                      value={dataToWrite}
+                      onChange={(e) => setDataToWrite(e.target.value)}
+                      placeholder="Digite os dados para gravar (ex: ID001, URL, etc.)"
+                      className="w-full rounded-xl border border-brand-100 px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setWriteMode(false);
+                          setDataToWrite("");
+                          setError(null);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleWriteNfc}
+                        disabled={nfc.status === "writing"}
+                      >
+                        {nfc.status === "writing" ? "Gravando..." : "Gravar NFC"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status de leitura/escrita */}
+                <div
+                  className={`mt-3 rounded-xl border px-3 py-3 text-sm ${
+                    nfc.status === "read-success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : nfc.status === "write-success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : nfc.status === "read-error" || nfc.status === "write-error"
+                          ? "border-rose-200 bg-rose-50 text-rose-600"
+                          : nfc.status === "permission-denied"
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : nfc.status === "scanning" || nfc.status === "writing"
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-dashed border-emerald-200 bg-white text-slate-600"
+                  }`}
+                >
+                  {nfc.status === "read-success" && identifierCode
+                    ? `✓ Leitura OK: ${identifierCode}`
+                    : nfc.status === "write-success"
+                      ? "✓ Dados gravados com sucesso na tag NFC!"
+                      : nfc.status === "read-error"
+                        ? `✗ ${nfc.error?.message || "Falha ao ler NFC. Tente novamente."}`
+                        : nfc.status === "write-error"
+                          ? `✗ ${nfc.error?.message || "Falha ao gravar NFC. Tente novamente."}`
+                          : nfc.status === "permission-denied"
+                            ? "⚠ Permissão NFC negada. Ative NFC nas configurações."
+                            : nfc.status === "scanning"
+                              ? "📡 Aguardando aproximação da tag NFC..."
+                              : nfc.status === "writing"
+                                ? "✍ Gravando... Mantenha a tag próxima."
+                                : "Aguardando leitura NFC..."}
+                </div>
+
+                {/* Informações adicionais de debug */}
+                {nfc.data && nfc.data.records.length > 0 && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    <details>
+                      <summary className="cursor-pointer hover:text-slate-700">
+                        Detalhes técnicos ({nfc.data.records.length} registro(s))
+                      </summary>
+                      <div className="mt-2 space-y-1 pl-3 border-l-2 border-slate-200">
+                        {nfc.data.serialNumber && (
+                          <p>Serial: {nfc.data.serialNumber}</p>
+                        )}
+                        {nfc.data.records.map((record, idx) => (
+                          <p key={idx}>
+                            Registro {idx + 1}: {record.recordType} = {record.data.substring(0, 50)}
+                            {record.data.length > 50 && "..."}
+                          </p>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <Button size="sm" variant={identifierType === "nfc" ? "default" : "outline"} onClick={() => setIdentifierType("nfc")}>
-                NFC
+                NFC Leitura
+              </Button>
+              <Button
+                size="sm"
+                variant={writeMode ? "default" : "outline"}
+                onClick={() => {
+                  setWriteMode(!writeMode);
+                  setIdentifierType("nfc");
+                  if (!writeMode) {
+                    nfc.stopScan();
+                  } else {
+                    nfc.startScan();
+                  }
+                }}
+                disabled={!nfc.isSupported}
+              >
+                NFC Gravação
               </Button>
               <Button size="sm" variant={identifierType === "barcode" ? "default" : "outline"} onClick={() => { setIdentifierType("barcode"); setScannerMode("barcode"); setScannerOpen(true); }}>
                 Codigo de barras
