@@ -14,7 +14,7 @@ const customerSchema = z.object({
   cpf: z.string().min(11),
   birthDate: z.string().optional(),
   phone: z.string().min(8),
-  email: z.string().email().optional(),
+  email: z.string().email().or(z.literal("")).optional(),
   credits: z.coerce.number().optional(),
   creditLimit: z.coerce.number().optional(),
   active: z.boolean().optional()
