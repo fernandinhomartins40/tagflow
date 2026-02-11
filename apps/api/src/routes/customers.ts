@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { cashRegisters, creditPayments, customers, customerIdentifiers, transactions, globalCustomers } from "../schema";
+import { cashRegisters, creditPayments, customers, customerIdentifiers, transactions, globalCustomers, tabs } from "../schema";
 import { and, eq, sql } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
@@ -189,7 +189,35 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
       })
       .where(and(eq(customerIdentifiers.id, existing.id), eq(customerIdentifiers.companyId, tenantId)))
       .returning();
-    return c.json(updated, 200);
+
+    // ✅ Verificar se já existe comanda aberta para este identificador
+    const [existingTab] = await db
+      .select()
+      .from(tabs)
+      .where(and(
+        eq(tabs.companyId, tenantId),
+        eq(tabs.customerId, id),
+        eq(tabs.status, "open")
+      ));
+
+    // Se não existe, criar comanda zerada
+    if (!existingTab) {
+      const [tab] = await db
+        .insert(tabs)
+        .values({
+          companyId: tenantId,
+          customerId: id,
+          identifierId: updated.id,
+          type: updated.tabType,
+          status: "open",
+          totalAmount: 0,
+          paidAmount: 0
+        })
+        .returning();
+      return c.json({ identifier: updated, tab }, 200);
+    }
+
+    return c.json({ identifier: updated, tab: existingTab }, 200);
   }
 
   const [created] = await db
@@ -205,7 +233,21 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
     })
     .returning();
 
-  return c.json(created, 201);
+  // ✅ Criar comanda zerada automaticamente
+  const [tab] = await db
+    .insert(tabs)
+    .values({
+      companyId: tenantId,
+      customerId: id,
+      identifierId: created.id,
+      type: created.tabType,
+      status: "open",
+      totalAmount: 0,
+      paidAmount: 0
+    })
+    .returning();
+
+  return c.json({ identifier: created, tab }, 201);
 });
 
 customersRoutes.post("/:id/add-credits", async (c) => {

@@ -29,6 +29,7 @@ export function AdminIdentifiers() {
   const [tabType, setTabType] = useState<TabType>("prepaid");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
@@ -82,6 +83,7 @@ export function AdminIdentifiers() {
         body: JSON.stringify({
           name,
           cpf: cpf ? onlyDigits(cpf) : null,
+          email: email.trim() || null,
           birthDate: birthDate ? toIsoDate(birthDate) : null,
           phone: phone ? onlyDigits(phone) : null,
           creditLimit: parseCurrencyInput(creditLimit)
@@ -106,6 +108,8 @@ export function AdminIdentifiers() {
       setTabType("prepaid");
       nfc.clear();
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-identifiers"] });
+      queryClient.invalidateQueries({ queryKey: ["tabs"] });
     }
   });
 
@@ -139,6 +143,7 @@ export function AdminIdentifiers() {
       customerId = created.id;
       setName("");
       setCpf("");
+      setEmail("");
       setBirthDate("");
       setPhone("");
       setCreditLimit("");
@@ -237,6 +242,13 @@ export function AdminIdentifiers() {
                   value={cpf}
                   onChange={(event) => setCpf(maskCpf(event.target.value))}
                   placeholder="CPF"
+                  className="w-full rounded-xl border border-brand-100 px-3 py-2"
+                />
+                <input
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="Email (opcional)"
+                  type="email"
                   className="w-full rounded-xl border border-brand-100 px-3 py-2"
                 />
                 <input
@@ -454,8 +466,17 @@ export function AdminIdentifiers() {
             </select>
             {error ? <p className="text-sm text-rose-500">{error}</p> : null}
             {successOpen ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                Identificador vinculado com sucesso.
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-emerald-800">
+                    <p className="font-semibold">Identificador vinculado com sucesso!</p>
+                    <p className="text-emerald-700 mt-1">
+                      Tipo: {identifierType === "nfc" ? "NFC" : identifierType === "barcode" ? "Código de Barras" : identifierType === "qr" ? "QR Code" : "Numeração"} •
+                      Comanda {tabType === "prepaid" ? "pré-paga" : "crédito"} criada
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : null}
             <Button onClick={handleSubmit} disabled={linkIdentifierMutation.isPending}>
