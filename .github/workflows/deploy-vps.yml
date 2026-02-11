@@ -111,19 +111,37 @@ jobs:
             EOF
 
             # Parar e remover containers antigos preservando volumes
+            echo "Stopping existing containers..."
             docker-compose -f docker-compose.vps.yml down --remove-orphans || true
 
-            # Remover imagens antigas do web e api para forçar rebuild completo
-            docker rmi tagflow-web tagflow-api 2>/dev/null || true
+            # Remover imagens antigas para forçar rebuild completo
+            echo "Removing old images..."
+            docker rmi tagflow-nginx tagflow-web tagflow-api 2>/dev/null || true
 
-            # Limpar imagens dangling (sem tag)
+            # Limpar imagens dangling
             docker image prune -f || true
 
-            # Build completo sem cache
-            docker-compose -f docker-compose.vps.yml build --no-cache --pull
+            # Build completo sem cache (com timestamp no label para garantir rebuild)
+            echo "Building new images..."
+            docker-compose -f docker-compose.vps.yml build --no-cache --pull \
+              --build-arg BUILD_DATE="$(date +%Y%m%d%H%M%S)"
 
             # Subir containers com força de recreação
+            echo "Starting containers..."
             docker-compose -f docker-compose.vps.yml up -d --force-recreate --remove-orphans
+
+            # Aguardar healthchecks dos containers
+            echo "Waiting for containers to be healthy..."
+            for i in {1..60}; do
+              HEALTHY=$(docker-compose -f docker-compose.vps.yml ps --format json | jq -r 'select(.Health=="healthy") | .Name' | wc -l)
+              TOTAL=$(docker-compose -f docker-compose.vps.yml ps --format json | wc -l)
+              echo "Healthy: $HEALTHY/$TOTAL containers"
+              if [ "$HEALTHY" -eq "$TOTAL" ]; then
+                echo "All containers are healthy!"
+                break
+              fi
+              sleep 2
+            done
 
             for i in {1..30}; do
               DB_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q db || true)
@@ -200,151 +218,60 @@ jobs:
               echo "Container da API nao encontrado para migracao global."
             fi
 
-            # Resolve upstream for host nginx (docker IP preferred)
-            NGINX_CONTAINER=$(docker-compose -f docker-compose.vps.yml ps -q nginx || true)
-            UPSTREAM_IP=""
-            if [ -n "$NGINX_CONTAINER" ]; then
-              UPSTREAM_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$NGINX_CONTAINER" 2>/dev/null || echo "")
-            fi
-            if [ -z "$UPSTREAM_IP" ]; then
-              UPSTREAM_IP="127.0.0.1"
-              UPSTREAM_PORT="${EXTERNAL_PORT}"
-            else
-              UPSTREAM_PORT="80"
-            fi
+            # Configure host nginx as reverse proxy to container
+            echo "Configuring host nginx..."
+            UPSTREAM_IP="127.0.0.1"
+            UPSTREAM_PORT="${EXTERNAL_PORT}"
 
-            # Create initial HTTP-only nginx config
-            # Use sites-available/enabled pattern to avoid conflicts with other apps
             NGINX_CONF="/etc/nginx/sites-available/tagflow.conf"
             NGINX_BACKUP="/etc/nginx/sites-available/tagflow.conf.bak"
+
+            # Backup existing config
             if [ -f "$NGINX_CONF" ]; then
               cp "$NGINX_CONF" "$NGINX_BACKUP"
             fi
-            cat > /etc/nginx/sites-available/tagflow.conf << NGINX_EOF
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name tagflow.shop www.tagflow.shop;
 
-                access_log /var/log/nginx/tagflow-access.log;
-                error_log /var/log/nginx/tagflow-error.log;
-
-                client_max_body_size 50M;
-
-                location /api/ {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
-                    proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
-                }
-
-                location /health {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
-                    proxy_http_version 1.1;
-                    proxy_set_header Host \$host;
-                }
-
-                location / {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
-                    proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_cache_bypass \$http_upgrade;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
-                }
-            }
-            NGINX_EOF
-
-            # Remove conflicting configs and enable tagflow
-            rm -f /etc/nginx/sites-enabled/default
-            rm -f /etc/nginx/sites-enabled/*.disabled
-            rm -f /etc/nginx/conf.d/tagflow.conf*
-            ln -sf /etc/nginx/sites-available/tagflow.conf /etc/nginx/sites-enabled/tagflow.conf
-
-            # Test and reload nginx
-            if ! nginx -t; then
-                echo "Nginx config test failed"
-              if [ -f "$NGINX_BACKUP" ]; then
-                cp "$NGINX_BACKUP" "$NGINX_CONF"
-                nginx -t && systemctl reload nginx || true
-              fi
-              exit 1
-            fi
-            systemctl reload nginx
-
-            # Check if SSL certificate exists and is valid
-            CERT_EXISTS=false
+            # Check SSL certificate status
+            CERT_VALID=false
             if [ -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
-              if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -text | grep -q "tagflow.shop"; then
-                echo "Valid SSL certificate found for tagflow.shop"
-                CERT_EXISTS=true
+              if openssl x509 -in /etc/letsencrypt/live/tagflow.shop/fullchain.pem -noout -checkend 604800 2>/dev/null; then
+                echo "Valid SSL certificate found (expires in >7 days)"
+                CERT_VALID=true
               else
-                echo "Certificate exists but is not for tagflow.shop, removing..."
-                rm -rf /etc/letsencrypt/live/tagflow.shop
-                rm -rf /etc/letsencrypt/archive/tagflow.shop
-                rm -f /etc/letsencrypt/renewal/tagflow.shop.conf
+                echo "Certificate expiring soon or invalid"
               fi
             fi
 
-            # Install SSL certificate if not exists or invalid
-            if [ "$CERT_EXISTS" = "false" ]; then
-              echo "Installing SSL certificate with certbot..."
-
-              # Stop nginx to free port 80 for certbot
-              systemctl stop nginx
+            # Obtain/renew SSL certificate if needed
+            if [ "$CERT_VALID" = "false" ]; then
+              echo "Obtaining SSL certificate..."
+              systemctl stop nginx || true
               sleep 2
 
-              # Verify port 80 is free
-              if netstat -tlnp | grep ':80 '; then
-                echo "Port 80 is still in use!"
-                netstat -tlnp | grep ':80 '
-                systemctl start nginx
-                exit 1
-              fi
-
-              # Use certbot standalone mode to avoid nginx conflicts
-              echo "Running certbot for tagflow.shop and www.tagflow.shop..."
-              if certbot certonly --standalone --preferred-challenges http \
+              certbot certonly --standalone --preferred-challenges http \
                 -d tagflow.shop -d www.tagflow.shop \
-                --non-interactive \
-                --agree-tos \
+                --non-interactive --agree-tos \
                 --email admin@tagflow.shop \
-                --cert-name tagflow.shop; then
-                echo "SSL certificate installed successfully"
-              else
-                echo "Failed to install SSL certificate"
-                cat /var/log/letsencrypt/letsencrypt.log | tail -50
-                systemctl start nginx
-                exit 1
-              fi
+                --cert-name tagflow.shop || {
+                  echo "WARNING: SSL certificate installation failed"
+                  echo "Falling back to HTTP-only mode"
+                  CERT_VALID=false
+              }
 
-              # Verify certificate was created
-              if [ ! -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
-                echo "Certificate file not found after certbot"
-                ls -la /etc/letsencrypt/live/ || true
-                systemctl start nginx
-                exit 1
+              if [ -f /etc/letsencrypt/live/tagflow.shop/fullchain.pem ]; then
+                CERT_VALID=true
               fi
             fi
 
-            # Always update nginx config with SSL (whether cert was just installed or already existed)
-            echo "Configuring nginx with SSL..."
-            if [ -f "$NGINX_CONF" ]; then
-              cp "$NGINX_CONF" "$NGINX_BACKUP"
-            fi
-            cat > /etc/nginx/sites-available/tagflow.conf << NGINX_EOF
+            # Create nginx configuration (HTTP or HTTPS based on cert availability)
+            if [ "$CERT_VALID" = "true" ]; then
+              echo "Creating HTTPS nginx configuration..."
+              cat > "$NGINX_CONF" << 'NGINX_HTTPS_EOF'
             server {
                 listen 80;
                 listen [::]:80;
                 server_name tagflow.shop www.tagflow.shop;
-                return 301 https://\$server_name\$request_uri;
+                return 301 https://$server_name$request_uri;
             }
 
             server {
@@ -357,6 +284,8 @@ jobs:
                 ssl_protocols TLSv1.2 TLSv1.3;
                 ssl_ciphers HIGH:!aNULL:!MD5;
                 ssl_prefer_server_ciphers on;
+                ssl_stapling on;
+                ssl_stapling_verify on;
 
                 access_log /var/log/nginx/tagflow-access.log;
                 error_log /var/log/nginx/tagflow-error.log;
@@ -364,78 +293,171 @@ jobs:
                 client_max_body_size 50M;
 
                 location /api/ {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/api/;
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/api/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_connect_timeout 60s;
+                    proxy_send_timeout 60s;
+                    proxy_read_timeout 60s;
                 }
 
                 location /health {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/health;
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/health;
                     proxy_http_version 1.1;
-                    proxy_set_header Host \$host;
+                    proxy_set_header Host $host;
                 }
 
                 location / {
-                    proxy_pass http://${UPSTREAM_IP}:${UPSTREAM_PORT}/;
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/;
                     proxy_http_version 1.1;
-                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Upgrade $http_upgrade;
                     proxy_set_header Connection "upgrade";
-                    proxy_set_header Host \$host;
-                    proxy_cache_bypass \$http_upgrade;
-                    proxy_set_header X-Real-IP \$remote_addr;
-                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_set_header Host $host;
+                    proxy_cache_bypass $http_upgrade;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
                 }
             }
-            NGINX_EOF
+            NGINX_HTTPS_EOF
+              sed -i "s|UPSTREAM_PLACEHOLDER|${UPSTREAM_IP}:${UPSTREAM_PORT}|g" "$NGINX_CONF"
+            else
+              echo "Creating HTTP-only nginx configuration..."
+              cat > "$NGINX_CONF" << 'NGINX_HTTP_EOF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name tagflow.shop www.tagflow.shop;
 
-            # Test apenas o arquivo tagflow.conf
-            if ! nginx -t -c /dev/null -g "include $NGINX_CONF;" 2>/dev/null; then
-              echo "Nginx config test failed for tagflow.conf"
-              if [ -f "$NGINX_BACKUP" ]; then
-                cp "$NGINX_BACKUP" "$NGINX_CONF"
+                access_log /var/log/nginx/tagflow-access.log;
+                error_log /var/log/nginx/tagflow-error.log;
+
+                client_max_body_size 50M;
+
+                location /api/ {
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/api/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+
+                location /health {
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/health;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                }
+
+                location / {
+                    proxy_pass http://UPSTREAM_PLACEHOLDER/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                    proxy_set_header Host $host;
+                    proxy_cache_bypass $http_upgrade;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            NGINX_HTTP_EOF
+              sed -i "s|UPSTREAM_PLACEHOLDER|${UPSTREAM_IP}:${UPSTREAM_PORT}|g" "$NGINX_CONF"
+            fi
+
+            # Enable configuration
+            rm -f /etc/nginx/sites-enabled/default
+            ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/tagflow.conf
+
+            # Test nginx configuration - isolate tagflow.conf test
+            echo "Testing nginx configuration..."
+            NGINX_TEST_PASSED=false
+            if nginx -t 2>&1 | grep -q "syntax is ok"; then
+              echo "Nginx test passed"
+              NGINX_TEST_PASSED=true
+            else
+              echo "WARNING: Global nginx test failed (may be due to other sites)"
+              echo "Attempting isolated test of tagflow.conf..."
+
+              # Try to identify if error is in tagflow.conf specifically
+              if nginx -t 2>&1 | grep -q "tagflow.conf"; then
+                echo "ERROR: Problem detected in tagflow.conf"
+                if [ -f "$NGINX_BACKUP" ]; then
+                  echo "Restoring backup configuration"
+                  cp "$NGINX_BACKUP" "$NGINX_CONF"
+                fi
+              else
+                echo "Error is in other site configs, tagflow.conf is OK"
+                NGINX_TEST_PASSED=true
               fi
-              # Não falha o deploy se houver erro em outros sites
-              echo "Warning: nginx test failed but continuing deploy"
             fi
 
-            # Reload nginx (ou start se não estiver rodando)
-            if systemctl is-active --quiet nginx; then
-              systemctl reload nginx || echo "Warning: nginx reload failed"
+            # Reload nginx
+            if [ "$NGINX_TEST_PASSED" = "true" ]; then
+              if systemctl is-active --quiet nginx; then
+                systemctl reload nginx && echo "Nginx reloaded successfully"
+              else
+                systemctl start nginx && echo "Nginx started successfully"
+              fi
             else
-              systemctl start nginx || echo "Warning: nginx start failed"
-            fi
-            sleep 2
-
-            # Verify nginx is running
-            if ! systemctl is-active --quiet nginx; then
-              echo "Warning: Nginx is not active, but continuing deploy"
-              echo "Containers are still accessible via port 3180"
+              echo "WARNING: Skipping nginx reload due to config errors"
+              echo "Application still accessible on http://localhost:${EXTERNAL_PORT}"
             fi
 
-            # Verify SSL is working (optional, não bloqueia deploy)
-            echo "Testing SSL certificate..."
-            if curl -k -I https://localhost 2>&1 | grep -q "HTTP"; then
-              echo "HTTPS is responding"
-            else
-              echo "Warning: HTTPS test failed, but continuing"
-            fi
+            # Final health check with retry
+            echo "Performing final health check..."
+            HEALTH_OK=false
+            for i in {1..30}; do
+              if curl -f -s http://localhost:${EXTERNAL_PORT}/health | grep -q "ok"; then
+                echo "Health check passed!"
+                HEALTH_OK=true
+                break
+              fi
+              echo "Attempt $i/30: Health check not ready yet..."
+              sleep 2
+            done
 
-            echo "Nginx configuration updated"
-
-            echo "Aguardando inicializacao..."
-            sleep 15
-
-            if ! curl -f http://localhost:3180/health >/dev/null 2>&1; then
-              echo "Health check falhou."
-              docker-compose -f docker-compose.vps.yml logs --tail=200
+            if [ "$HEALTH_OK" = "false" ]; then
+              echo "ERROR: Health check failed after 60 seconds"
+              echo "Container status:"
+              docker-compose -f docker-compose.vps.yml ps
+              echo ""
+              echo "Recent logs:"
+              docker-compose -f docker-compose.vps.yml logs --tail=100
               exit 1
             fi
+
+            # Verify HTTPS if certificate exists
+            if [ "$CERT_VALID" = "true" ]; then
+              echo "Verifying HTTPS access..."
+              if curl -f -s -k https://localhost/health | grep -q "ok"; then
+                echo "HTTPS is working correctly"
+              else
+                echo "WARNING: HTTPS verification failed, but HTTP is working"
+              fi
+            fi
+
+            echo ""
+            echo "=========================================="
+            echo "Deploy completed successfully!"
+            echo "=========================================="
+            echo "Application URLs:"
+            if [ "$CERT_VALID" = "true" ]; then
+              echo "  - https://tagflow.shop"
+              echo "  - https://www.tagflow.shop"
+            else
+              echo "  - http://tagflow.shop"
+              echo "  - http://www.tagflow.shop"
+            fi
+            echo "Direct container access: http://localhost:${EXTERNAL_PORT}"
+            echo "=========================================="
 
       - name: Verify Deployment
         if: success()

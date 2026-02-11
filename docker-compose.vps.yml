@@ -1,13 +1,25 @@
 services:
   nginx:
     image: nginx:alpine
+    container_name: tagflow-nginx
+    restart: unless-stopped
     ports:
       - "${EXTERNAL_PORT:-3180}:80"
     volumes:
       - ./nginx.vps.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - web
-      - api
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - tagflow
 
   web:
     build:
@@ -15,11 +27,23 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL}
         BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: tagflow-web
+    restart: unless-stopped
     expose:
       - "80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - tagflow
 
   api:
     build: ./apps/api
+    container_name: tagflow-api
+    restart: unless-stopped
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -28,15 +52,29 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_SUBJECT=${VAPID_SUBJECT}
     expose:
       - "3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - tagflow
 
   db:
     image: postgres:16-alpine
+    container_name: tagflow-db
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -45,7 +83,22 @@ services:
       - postgres_data:/var/lib/postgresql/data
     expose:
       - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tagflow
 
 volumes:
   postgres_data:
+    name: tagflow_postgres_data
   uploads_data:
+    name: tagflow_uploads_data
+
+networks:
+  tagflow:
+    name: tagflow_network
+    driver: bridge
