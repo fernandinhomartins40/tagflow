@@ -6,20 +6,33 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
 clientsClaim();
 cleanupOutdatedCaches();
 
+// Força limpeza de todos os caches antigos ao ativar nova versão
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => !name.includes(CACHE_VERSION))
+          .map((name) => caches.delete(name))
+      );
+    })
+  );
+});
+
 const apiStrategy = new NetworkFirst({
   cacheName: `api-cache-${CACHE_VERSION}`,
-  networkTimeoutSeconds: 10,
+  networkTimeoutSeconds: 3,
   plugins: [
     new ExpirationPlugin({
       maxEntries: 50,
-      maxAgeSeconds: 5 * 60 // 5 minutos
+      maxAgeSeconds: 2 * 60 // 2 minutos
     })
   ]
 });
@@ -57,11 +70,11 @@ registerRoute(
 
 const pageStrategy = new NetworkFirst({
   cacheName: `page-cache-${CACHE_VERSION}`,
-  networkTimeoutSeconds: 10,
+  networkTimeoutSeconds: 3,
   plugins: [
     new ExpirationPlugin({
       maxEntries: 30,
-      maxAgeSeconds: 24 * 60 * 60 // 24 horas
+      maxAgeSeconds: 1 * 60 * 60 // 1 hora
     })
   ]
 });
