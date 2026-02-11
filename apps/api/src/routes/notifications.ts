@@ -10,8 +10,21 @@ const vapidPublicKey = process.env.VAPID_PUBLIC_KEY ?? "";
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? "";
 const vapidSubject = process.env.VAPID_SUBJECT ?? "mailto:admin@tagflow.local";
 
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+// Only configure VAPID if keys are properly set (not placeholder values)
+const vapidConfigured = vapidPublicKey &&
+                        vapidPrivateKey &&
+                        vapidPublicKey !== "replace_me" &&
+                        vapidPrivateKey !== "replace_me";
+
+if (vapidConfigured) {
+  try {
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    console.log("Push notifications configured successfully");
+  } catch (err) {
+    console.warn("Failed to configure push notifications:", err);
+  }
+} else {
+  console.warn("Push notifications disabled: VAPID keys not configured");
 }
 
 const subscriptionSchema = z.object({
@@ -53,8 +66,8 @@ notificationsRoutes.post("/send", async (c) => {
   const tenantId = getTenantId(c);
   const body = notificationSchema.parse(await c.req.json());
 
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    return c.json({ error: "VAPID keys not configured" }, 500);
+  if (!vapidConfigured) {
+    return c.json({ error: "Push notifications not configured. Please set VAPID keys." }, 503);
   }
 
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.companyId, tenantId));
