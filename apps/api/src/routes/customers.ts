@@ -12,7 +12,7 @@ const customerSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
   name: z.string().min(2),
   cpf: z.string().min(11),
-  birthDate: z.coerce.date().optional().nullable(),
+  birthDate: z.string().optional().nullable(),
   phone: z.string().min(8),
   email: z.string().email().optional().nullable(),
   credits: z.coerce.number().optional().nullable(),
@@ -115,9 +115,9 @@ customersRoutes.post("/", async (c) => {
       companyId: tenantId,
       cpf: normalizedCpf,
       phone: normalizedPhone,
-      email: body.email || undefined,
-      birthDate: body.birthDate || undefined,
-      creditLimit: body.creditLimit || undefined,
+      email: body.email ?? undefined,
+      birthDate: body.birthDate ?? undefined,
+      creditLimit: body.creditLimit ?? undefined,
       globalCustomerId
     })
     .returning();
@@ -144,9 +144,9 @@ customersRoutes.put("/:id", async (c) => {
   // Remove null values, keep only defined values
   const updateData: any = {};
   if (body.name !== undefined) updateData.name = body.name;
-  if (body.email !== undefined) updateData.email = body.email || undefined;
-  if (body.birthDate !== undefined) updateData.birthDate = body.birthDate || undefined;
-  if (body.creditLimit !== undefined) updateData.creditLimit = body.creditLimit || undefined;
+  if (body.email !== undefined) updateData.email = body.email ?? undefined;
+  if (body.birthDate !== undefined) updateData.birthDate = body.birthDate ?? undefined;
+  if (body.creditLimit !== undefined) updateData.creditLimit = body.creditLimit ?? undefined;
   if (normalizedCpf) updateData.cpf = normalizedCpf;
   if (normalizedPhone) updateData.phone = normalizedPhone;
 
