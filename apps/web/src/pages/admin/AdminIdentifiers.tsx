@@ -78,16 +78,24 @@ export function AdminIdentifiers() {
 
   const createCustomerMutation = useMutation({
     mutationFn: async () => {
+      const payload: any = {
+        name,
+        cpf: onlyDigits(cpf),
+        phone: onlyDigits(phone)
+      };
+
+      // Só adicionar campos opcionais se tiverem valor
+      if (email.trim()) payload.email = email.trim();
+
+      const isoDate = toIsoDate(birthDate);
+      if (isoDate) payload.birthDate = isoDate;
+
+      const limit = parseCurrencyInput(creditLimit);
+      if (limit && limit > 0) payload.creditLimit = limit;
+
       return apiFetch<Customer>("/api/customers", {
         method: "POST",
-        body: JSON.stringify({
-          name,
-          cpf: cpf ? onlyDigits(cpf) : null,
-          email: email.trim() || null,
-          birthDate: birthDate ? toIsoDate(birthDate) : null,
-          phone: phone ? onlyDigits(phone) : null,
-          creditLimit: parseCurrencyInput(creditLimit)
-        })
+        body: JSON.stringify(payload)
       });
     }
   });
