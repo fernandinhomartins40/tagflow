@@ -116,7 +116,7 @@ customersRoutes.post("/", async (c) => {
       cpf: normalizedCpf,
       phone: normalizedPhone,
       email: body.email ?? undefined,
-      birthDate: body.birthDate ?? undefined,
+      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
       creditLimit: body.creditLimit ?? undefined,
       globalCustomerId
     })
@@ -145,7 +145,7 @@ customersRoutes.put("/:id", async (c) => {
   const updateData: any = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.email !== undefined) updateData.email = body.email ?? undefined;
-  if (body.birthDate !== undefined) updateData.birthDate = body.birthDate ?? undefined;
+  if (body.birthDate !== undefined) updateData.birthDate = body.birthDate ? new Date(body.birthDate) : undefined;
   if (body.creditLimit !== undefined) updateData.creditLimit = body.creditLimit ?? undefined;
   if (normalizedCpf) updateData.cpf = normalizedCpf;
   if (normalizedPhone) updateData.phone = normalizedPhone;
