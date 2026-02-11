@@ -6,7 +6,7 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();

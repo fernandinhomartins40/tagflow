@@ -51,6 +51,12 @@ export function useNfc(options: UseNfcOptions = {}) {
 
   const readerRef = useRef<any>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const optionsRef = useRef(options);
+
+  // Mantém optionsRef atualizado sem causar re-renders
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   // Verifica se NFC é suportado
   const checkSupport = useCallback(() => {
@@ -66,7 +72,7 @@ export function useNfc(options: UseNfcOptions = {}) {
         setError(err);
         setStatus("not-supported");
         setIsSupported(false);
-        options.onError?.(err);
+        optionsRef.current.onError?.(err);
         return false;
       }
     }
@@ -80,14 +86,14 @@ export function useNfc(options: UseNfcOptions = {}) {
       setError(err);
       setStatus("not-supported");
       setIsSupported(false);
-      options.onError?.(err);
+      optionsRef.current.onError?.(err);
       return false;
     }
 
     setIsSupported(true);
     setStatus("idle");
     return true;
-  }, [options]);
+  }, []);
 
   // Solicita permissão NFC
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -110,7 +116,7 @@ export function useNfc(options: UseNfcOptions = {}) {
             setError(err);
             setStatus("permission-denied");
             setHasPermission(false);
-            options.onError?.(err);
+            optionsRef.current.onError?.(err);
             return false;
           }
         } catch (e) {
@@ -129,10 +135,10 @@ export function useNfc(options: UseNfcOptions = {}) {
       };
       setError(nfcError);
       setStatus("permission-denied");
-      options.onError?.(nfcError);
+      optionsRef.current.onError?.(nfcError);
       return false;
     }
-  }, [options]);
+  }, []);
 
   // Decodifica dados do registro NDEF
   const decodeRecord = useCallback((record: any): NfcRecord => {
@@ -206,7 +212,7 @@ export function useNfc(options: UseNfcOptions = {}) {
 
         setData(readEvent);
         setStatus("read-success");
-        options.onRead?.(readEvent);
+        optionsRef.current.onRead?.(readEvent);
       };
 
       reader.onreadingerror = (event: any) => {
@@ -218,7 +224,7 @@ export function useNfc(options: UseNfcOptions = {}) {
         };
         setError(err);
         setStatus("read-error");
-        options.onError?.(err);
+        optionsRef.current.onError?.(err);
       };
 
     } catch (err: any) {
@@ -246,9 +252,9 @@ export function useNfc(options: UseNfcOptions = {}) {
 
       setError(nfcError);
       setStatus("read-error");
-      options.onError?.(nfcError);
+      optionsRef.current.onError?.(nfcError);
     }
-  }, [checkSupport, requestPermission, decodeRecord, options]);
+  }, [checkSupport, requestPermission, decodeRecord]);
 
   // Para escaneamento
   const stopScan = useCallback(() => {
@@ -311,7 +317,7 @@ export function useNfc(options: UseNfcOptions = {}) {
 
       console.log("NFC escrito com sucesso:", records);
       setStatus("write-success");
-      options.onWrite?.();
+      optionsRef.current.onWrite?.();
 
       return true;
 
@@ -343,11 +349,11 @@ export function useNfc(options: UseNfcOptions = {}) {
 
       setError(nfcError);
       setStatus("write-error");
-      options.onError?.(nfcError);
+      optionsRef.current.onError?.(nfcError);
 
       return false;
     }
-  }, [checkSupport, requestPermission, options]);
+  }, [checkSupport, requestPermission]);
 
   // Limpa dados lidos
   const clear = useCallback(() => {
@@ -358,19 +364,19 @@ export function useNfc(options: UseNfcOptions = {}) {
 
   // Auto-start se configurado
   useEffect(() => {
-    if (options.autoStart) {
+    if (optionsRef.current.autoStart) {
       startScan();
     }
 
     return () => {
       stopScan();
     };
-  }, []);
+  }, [startScan, stopScan]);
 
-  // Verifica suporte na montagem
+  // Verifica suporte na montagem (apenas uma vez)
   useEffect(() => {
     checkSupport();
-  }, [checkSupport]);
+  }, []);
 
   return {
     // Estado
