@@ -111,10 +111,13 @@ customersRoutes.post("/", async (c) => {
   const [created] = await db
     .insert(customers)
     .values({
-      ...body,
+      name: body.name,
       companyId: tenantId,
       cpf: normalizedCpf,
       phone: normalizedPhone,
+      email: body.email || undefined,
+      birthDate: body.birthDate || undefined,
+      creditLimit: body.creditLimit || undefined,
       globalCustomerId
     })
     .returning();
@@ -138,9 +141,18 @@ customersRoutes.put("/:id", async (c) => {
     });
   }
 
+  // Remove null values, keep only defined values
+  const updateData: any = {};
+  if (body.name !== undefined) updateData.name = body.name;
+  if (body.email !== undefined) updateData.email = body.email || undefined;
+  if (body.birthDate !== undefined) updateData.birthDate = body.birthDate || undefined;
+  if (body.creditLimit !== undefined) updateData.creditLimit = body.creditLimit || undefined;
+  if (normalizedCpf) updateData.cpf = normalizedCpf;
+  if (normalizedPhone) updateData.phone = normalizedPhone;
+
   const [updated] = await db
     .update(customers)
-    .set(body)
+    .set(updateData)
     .where(and(eq(customers.id, id), eq(customers.companyId, tenantId)))
     .returning();
 
