@@ -23,10 +23,16 @@ export const authMiddleware = async (c: Context, next: Next) => {
     if (!user || !user.active) {
       return c.json({ error: "User inactive" }, 403);
     }
-    const tenantId = c.get("tenantId") as string | undefined;
-    if (tenantId && payload.role !== "super_admin" && payload.companyId !== tenantId) {
+
+    // Verifica se tenantId já foi setado (por subdomain no tenantMiddleware)
+    const existingTenantId = c.get("tenantId") as string | undefined;
+    if (existingTenantId && payload.role !== "super_admin" && payload.companyId !== existingTenantId) {
       return c.json({ error: "Tenant mismatch" }, 403);
     }
+
+    // ✅ NOVA LÓGICA: AuthMiddleware sempre seta tenantId do JWT
+    // Isso garante que rotas protegidas sempre tenham tenant context
+    c.set("tenantId", payload.companyId);
     c.set("user", payload);
     await next();
   } catch {

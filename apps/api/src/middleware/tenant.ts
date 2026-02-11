@@ -10,64 +10,56 @@ if (!jwtSecret) {
   throw new Error("JWT_SECRET is required");
 }
 
+/**
+ * TenantMiddleware - Simplificado
+ *
+ * Responsabilidades:
+ * 1. Excluir rotas públicas que não precisam de tenant
+ * 2. Detectar tenant por subdomain (para multi-tenant SaaS futuro)
+ *
+ * IMPORTANTE: O tenantId principal vem do authMiddleware via JWT cookie.
+ * Este middleware apenas complementa com detecção de subdomain.
+ */
 export const tenantMiddleware = async (c: Context, next: Next) => {
   const path = c.req.path;
-  if (
-    path.startsWith("/api/superadmin") ||
-    path.startsWith("/superadmin") ||
-    path.startsWith("/api/stripe/webhook") ||
-    path.startsWith("/api/auth/signup") ||
-    path.startsWith("/auth/signup") ||
-    path.startsWith("/api/auth/login") ||
-    path.startsWith("/auth/login") ||
-    path.startsWith("/api/auth/refresh") ||
-    path.startsWith("/auth/refresh") ||
-    path.startsWith("/api/auth/me") ||
-    path.startsWith("/auth/me") ||
-    path.startsWith("/api/auth/logout") ||
-    path.startsWith("/auth/logout") ||
-    path.startsWith("/api/customer") ||
-    path.startsWith("/customer") ||
-    path.startsWith("/api/public/plans") ||
-    path.startsWith("/public/plans")
-  ) {
+
+  // Rotas que NÃO precisam de tenant context
+  const publicPaths = [
+    "/api/superadmin",
+    "/superadmin",
+    "/api/stripe/webhook",
+    "/api/auth",      // Todas as rotas de auth (signup, login, refresh, me, logout)
+    "/auth",
+    "/api/customer",  // Customer app (PWA separado)
+    "/customer",
+    "/api/public",    // Rotas públicas (plans, etc)
+    "/public"
+  ];
+
+  if (publicPaths.some(p => path.startsWith(p))) {
     await next();
     return;
   }
 
-  const headerTenantId = c.req.header("x-tenant-id");
-  if (headerTenantId) {
-    c.set("tenantId", headerTenantId);
-    await next();
-    return;
-  }
-
-  const token = getCookie(c, "tf_access");
-  if (token) {
-    try {
-      const payload = jwt.verify(token, jwtSecret) as { companyId?: string };
-      if (payload.companyId) {
-        c.set("tenantId", payload.companyId);
-        await next();
-        return;
-      }
-    } catch {
-      // ignore and continue to tenant detection
-    }
-  }
-
+  // Detecção de tenant por subdomain (opcional, para futuro multi-tenant SaaS)
+  // Exemplo: empresa1.tagflow.shop, empresa2.tagflow.shop
   const host = c.req.header("host") || "";
   const subdomain = host.split(".")[0];
 
-  if (subdomain && subdomain !== "localhost") {
+  // Se tem subdomain válido (não localhost, não tagflow), valida
+  if (subdomain && subdomain !== "localhost" && subdomain !== "tagflow") {
     const [company] = await db.select().from(companies).where(eq(companies.domain, subdomain));
+
     if (!company) {
-      return c.json({ error: "Tenant not found" }, 404);
+      return c.json({ error: "Tenant not found for subdomain" }, 404);
     }
+
+    // Seta tenantId do subdomain
+    // AuthMiddleware vai validar se o JWT bate com este tenant
     c.set("tenantId", company.id);
-    await next();
-    return;
   }
 
-  return c.json({ error: "Tenant not provided" }, 400);
+  // Continua para o próximo middleware
+  // AuthMiddleware vai setar tenantId do JWT se não foi setado aqui
+  await next();
 };

@@ -28,22 +28,35 @@ import { customerRoutes } from "./routes/customer";
 
 const app = new Hono();
 
+// === Global Middlewares (ordem importa!) ===
+
+// 1. Security headers
 app.use("/*", secureHeaders());
+
+// 2. CORS - permite cookies httpOnly
 const corsOrigin = process.env.CORS_ORIGIN;
 app.use(
   "/*",
   cors({
     origin: (origin) => corsOrigin ?? origin ?? "http://localhost:8080",
-    allowHeaders: ["Content-Type", "Authorization", "X-Tenant-Id"],
-    credentials: true
+    allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true // ✅ Essencial para cookies httpOnly
   })
 );
+
+// 3. Rate limiting
 app.use("/*", rateLimit(120, 60_000));
+
+// 4. Tenant detection (opcional: apenas subdomain)
+// AuthMiddleware vai setar tenantId do JWT cookie nas rotas protegidas
 app.use("/api/*", tenantMiddleware);
 app.use("/auth/*", tenantMiddleware);
 app.use("/public/*", tenantMiddleware);
 
+// === Public Routes (sem autenticação) ===
+
 app.get("/health", (c) => c.json({ status: "ok" }));
+
 app.get("/uploads/:tenant/:file", (c) => {
   const tenant = c.req.param("tenant");
   const file = c.req.param("file");
@@ -51,18 +64,31 @@ app.get("/uploads/:tenant/:file", (c) => {
   return c.body(Bun.file(filePath));
 });
 
+// Rotas de autenticação (login, signup, etc)
 app.route("/api/auth", authRoutes);
 app.route("/auth", authRoutes);
+
+// Webhooks e integrações externas
 app.route("/api/stripe", stripeRoutes);
+
+// Customer app (PWA separado, sem tenant)
 app.route("/api/customer", customerRoutes);
 
+// Rotas públicas (plans, etc)
+app.route("/api/public", publicRoutes);
+app.route("/public", publicRoutes);
+
+// === Protected Routes (requerem autenticação) ===
+
+// SuperAdmin routes
 const superAdmin = new Hono();
-superAdmin.use("/*", authMiddleware);
+superAdmin.use("/*", authMiddleware); // ✅ AuthMiddleware seta tenantId aqui
 superAdmin.route("/", superAdminRoutes);
 app.route("/api/superadmin", superAdmin);
 
+// Admin/User routes
 const secure = new Hono();
-secure.use("/*", authMiddleware);
+secure.use("/*", authMiddleware); // ✅ AuthMiddleware seta tenantId do JWT cookie
 secure.route("/companies", companiesRoutes);
 secure.route("/branches", branchesRoutes);
 secure.route("/customers", customersRoutes);
@@ -80,8 +106,6 @@ secure.route("/billing", billingRoutes);
 
 app.route("/api", secure);
 app.route("/", secure);
-app.route("/api/public", publicRoutes);
-app.route("/public", publicRoutes);
 
 app.onError((err, c) => {
   logger.error(err);
