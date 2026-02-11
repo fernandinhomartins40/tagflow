@@ -25,6 +25,7 @@ export function AdminCustomers() {
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -42,6 +43,8 @@ export function AdminCustomers() {
       };
 
       // Só adicionar campos opcionais se tiverem valor
+      if (email.trim()) payload.email = email.trim();
+
       const isoDate = toIsoDate(birthDate);
       if (isoDate) payload.birthDate = isoDate;
 
@@ -58,6 +61,7 @@ export function AdminCustomers() {
       setCpf("");
       setBirthDate("");
       setPhone("");
+      setEmail("");
       setCreditLimit("");
       setFormError(null);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -121,6 +125,13 @@ export function AdminCustomers() {
             value={phone}
             onChange={(event) => setPhone(maskPhone(event.target.value))}
             placeholder="Telefone/WhatsApp"
+            className="w-full rounded-xl border border-brand-100 px-3 py-2"
+          />
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email (opcional)"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <input
