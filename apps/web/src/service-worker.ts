@@ -6,7 +6,7 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
@@ -37,20 +37,10 @@ const apiStrategy = new NetworkFirst({
   ]
 });
 
-registerRoute(({ url }) => url.pathname.startsWith("/api"), async (args) => {
-  try {
-    const response = await apiStrategy.handle(args);
-    if (response && response.ok) return response;
-  } catch (error) {
-    console.warn('API request failed:', args.request.url, error);
-  }
-
-  // Retorna erro offline apenas se realmente não houver cache
-  return new Response(JSON.stringify({ error: "offline" }), {
-    status: 503,
-    headers: { "Content-Type": "application/json" }
-  });
-});
+registerRoute(
+  ({ url }) => url.pathname.startsWith("/api"),
+  apiStrategy
+);
 
 registerRoute(
   ({ request }) => request.destination === "script" || request.destination === "style",
