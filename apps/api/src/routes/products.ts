@@ -39,7 +39,21 @@ productsRoutes.get("/", async (c) => {
 productsRoutes.post("/", async (c) => {
   const tenantId = getTenantId(c);
   const body = productSchema.parse(await c.req.json());
-  const [created] = await db.insert(products).values({ ...body, companyId: tenantId }).returning();
+
+  // Remove undefined/null fields to use database defaults
+  const insertData: any = {
+    name: body.name,
+    price: body.price,
+    companyId: tenantId
+  };
+
+  if (body.description) insertData.description = body.description;
+  if (body.category) insertData.category = body.category;
+  if (body.stock !== undefined && body.stock !== null) insertData.stock = body.stock;
+  if (body.active !== undefined && body.active !== null) insertData.active = body.active;
+  if (body.imageUrl) insertData.imageUrl = body.imageUrl;
+
+  const [created] = await db.insert(products).values(insertData).returning();
   return c.json(created, 201);
 });
 

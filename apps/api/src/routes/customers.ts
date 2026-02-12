@@ -134,16 +134,28 @@ customersRoutes.post("/", async (c) => {
     logger.debug("Global customer ID obtained", "CUSTOMERS", { globalCustomerId });
 
     // Prepare data for insertion
-    const insertData = {
+    const insertData: any = {
       name: body.name,
       companyId: tenantId,
       cpf: normalizedCpf,
       phone: normalizedPhone,
-      email: body.email ?? undefined,
-      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
-      creditLimit: body.creditLimit ?? undefined,
       globalCustomerId
     };
+
+    // Add optional fields only if they have values
+    if (body.email) {
+      insertData.email = body.email;
+    }
+    if (body.birthDate) {
+      insertData.birthDate = new Date(body.birthDate);
+    }
+    if (body.creditLimit !== undefined && body.creditLimit !== null) {
+      insertData.creditLimit = body.creditLimit;
+    }
+    if (body.branchId) {
+      insertData.branchId = body.branchId;
+    }
+
     logger.db("INSERT", "customers", insertData);
 
     // Insert customer

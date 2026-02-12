@@ -41,7 +41,23 @@ locationsRoutes.get("/", async (c) => {
 locationsRoutes.post("/", async (c) => {
   const tenantId = getTenantId(c);
   const body = locationSchema.parse(await c.req.json());
-  const [created] = await db.insert(locations).values({ ...body, companyId: tenantId }).returning();
+
+  // Remove undefined/null fields to use database defaults
+  const insertData: any = {
+    name: body.name,
+    type: body.type,
+    price: body.price,
+    priceUnit: body.priceUnit,
+    companyId: tenantId
+  };
+
+  if (body.branchId) insertData.branchId = body.branchId;
+  if (body.description) insertData.description = body.description;
+  if (body.capacity !== undefined && body.capacity !== null) insertData.capacity = body.capacity;
+  if (body.active !== undefined && body.active !== null) insertData.active = body.active;
+  if (body.imageUrl) insertData.imageUrl = body.imageUrl;
+
+  const [created] = await db.insert(locations).values(insertData).returning();
   return c.json(created, 201);
 });
 
