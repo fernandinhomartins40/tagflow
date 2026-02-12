@@ -67,8 +67,8 @@ export function AdminCustomers() {
     setValue,
     reset,
     formState: { errors, isSubmitting }
-  } = useForm<CreateCustomerInput>({
-    resolver: zodResolver(createCustomerSchema),
+  } = useForm<any>({
+    resolver: zodResolver(createCustomerSchema) as any,
     defaultValues: {
       name: "",
       cpf: "",

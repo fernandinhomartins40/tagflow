@@ -46,8 +46,8 @@ export function CustomerEditModal({
     setValue,
     reset,
     formState: { errors, isSubmitting }
-  } = useForm<CreateCustomerInput>({
-    resolver: zodResolver(createCustomerSchema.partial()),
+  } = useForm<any>({
+    resolver: zodResolver(createCustomerSchema.partial()) as any,
     defaultValues: {
       name: customer.name,
       email: customer.email || "",

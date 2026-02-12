@@ -137,17 +137,10 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       code: string;
       tabType: string
     }) => {
-      const response = await apiFetch(`/api/customers/${id}/activate-tag`, {
+      return apiFetch(`/api/customers/${id}/activate-tag`, {
         method: "POST",
         body: JSON.stringify({ type, code, tabType })
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || error.error || "Erro ao vincular identificador");
-      }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });

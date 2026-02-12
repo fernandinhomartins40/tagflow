@@ -733,9 +733,9 @@ export function AdminPdv() {
                 <ItemCard
                   key={product.id}
                   title={product.name}
-                  imageUrl={product.imageUrlSmall || product.imageUrl ?? undefined}
+                  imageUrl={(product.imageUrlSmall || product.imageUrl) ?? undefined}
                   price={Number(product.price)}
-                  onAdd={() => addItem({ key: `product-${product.id}`, type: "product", id: product.id, name: product.name, price: Number(product.price), quantity: 1, imageUrl: product.imageUrlSmall || product.imageUrl ?? undefined })}
+                  onAdd={() => addItem({ key: `product-${product.id}`, type: "product", id: product.id, name: product.name, price: Number(product.price), quantity: 1, imageUrl: (product.imageUrlSmall || product.imageUrl) ?? undefined })}
                   onRemove={() => removeItem(`product-${product.id}`)}
                 />
               ))}
@@ -767,9 +767,9 @@ export function AdminPdv() {
                 <ItemCard
                   key={service.id}
                   title={service.name}
-                  imageUrl={service.imageUrlSmall || service.imageUrl ?? undefined}
+                  imageUrl={(service.imageUrlSmall || service.imageUrl) ?? undefined}
                   price={Number(service.price)}
-                  onAdd={() => addItem({ key: `service-${service.id}`, type: "service", id: service.id, name: service.name, price: Number(service.price), quantity: 1, imageUrl: service.imageUrlSmall || service.imageUrl ?? undefined })}
+                  onAdd={() => addItem({ key: `service-${service.id}`, type: "service", id: service.id, name: service.name, price: Number(service.price), quantity: 1, imageUrl: (service.imageUrlSmall || service.imageUrl) ?? undefined })}
                   onRemove={() => removeItem(`service-${service.id}`)}
                 />
               ))}
@@ -802,7 +802,7 @@ export function AdminPdv() {
                   <ItemCard
                     key={location.id}
                     title={`${location.name} - R$ ${location.price}/${priceUnits[location.priceUnit]}`}
-                    imageUrl={location.imageUrlSmall || location.imageUrl ?? undefined}
+                    imageUrl={(location.imageUrlSmall || location.imageUrl) ?? undefined}
                     price={Number(location.price)}
                     onAdd={() => openLocationModal(location)}
                     onRemove={() => removeItem(`location-${location.id}-${locationStart}-${locationEnd}`)}
