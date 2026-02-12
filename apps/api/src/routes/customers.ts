@@ -94,10 +94,16 @@ customersRoutes.post("/", async (c) => {
 
     // Check plan limits before creating
     logger.debug("Checking plan limits", "CUSTOMERS", { tenantId });
-    const limitCheck = await validateCustomerLimit(c, tenantId);
-    if (limitCheck) {
-      logger.warn("Plan limit exceeded", "CUSTOMERS", { tenantId });
-      return limitCheck;
+    try {
+      const limitCheck = await validateCustomerLimit(c, tenantId);
+      if (limitCheck) {
+        logger.warn("Plan limit exceeded", "CUSTOMERS", { tenantId });
+        return limitCheck;
+      }
+      logger.debug("Plan limit check passed", "CUSTOMERS");
+    } catch (planError) {
+      logger.error("Error checking plan limits, allowing creation as fail-safe", "CUSTOMERS", planError);
+      // Continue apesar do erro - fail-safe
     }
 
     // Parse and validate request body
