@@ -18,7 +18,8 @@
       "Bash(bunx tsc:*)",
       "Bash(bun add:*)",
       "Bash(bun run build:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(timeout 120 bash -c 'while true; do ssh root@tagflow.shop \"\"docker logs tagflow-api --tail 5 2>&1 | grep -i \\\\\"\"started\\\\\\\\|running\\\\\\\\|error\\\\\"\" || echo \\\\\"\"Aguardando deploy...\\\\\"\"\"\"; sleep 10; done')"
     ]
   }
 }

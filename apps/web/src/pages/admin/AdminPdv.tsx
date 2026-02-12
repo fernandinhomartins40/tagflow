@@ -351,7 +351,7 @@ export function AdminPdv() {
       try {
         await apiFetch(`/api/customers/${searchCustomerId}/activate-tag`, {
           method: "POST",
-          body: JSON.stringify({ type: "manual", code: resolved })
+          body: JSON.stringify({ type: "manual", code: resolved, tabType })
         });
       } catch {
         // ignore conflict
