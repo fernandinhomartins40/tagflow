@@ -149,15 +149,27 @@ export function AdminPdv() {
   const nfc = useNfc({
     onRead: (event) => {
       console.log("NFC lido:", event);
+      let nfcCode = "";
+
       // Se tem serial number, usa ele
       if (event.serialNumber) {
+        nfcCode = event.serialNumber;
         setIdentifier(event.serialNumber);
       } else if (event.records.length > 0) {
         // Senão, usa o primeiro registro de texto
         const textRecord = event.records.find(r => r.recordType === "text");
         if (textRecord) {
+          nfcCode = textRecord.data;
           setIdentifier(textRecord.data);
         }
+      }
+
+      // Auto-submit quando NFC é lido com sucesso
+      if (nfcCode && identifyOpen) {
+        console.log("Auto-submetendo NFC:", nfcCode);
+        setTimeout(() => {
+          handleConfirmIdentify();
+        }, 500); // Pequeno delay para garantir que o state foi atualizado
       }
     },
     onError: (err) => {
@@ -863,28 +875,32 @@ export function AdminPdv() {
             {identifyMethod === "nfc" ? (
               <div
               className={`rounded-xl border p-3 text-sm ${
-                nfc.status === "read-success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200"
-                  : nfc.status === "read-error" || nfc.status === "write-error"
-                    ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
-                    : nfc.status === "permission-denied"
-                      ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200"
-                      : nfc.status === "not-supported"
-                        ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
-                        : "border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300"
+                isProcessing && identifier
+                  ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200"
+                  : nfc.status === "read-success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                    : nfc.status === "read-error" || nfc.status === "write-error"
+                      ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
+                      : nfc.status === "permission-denied"
+                        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200"
+                        : nfc.status === "not-supported"
+                          ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200"
+                          : "border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a2420] dark:bg-[#1b1613] dark:text-neutral-300"
               }`}
             >
-                {nfc.status === "read-success" && identifier
-                  ? `✓ Leitura OK: ${identifier}`
-                  : nfc.status === "read-error"
-                    ? `✗ ${nfc.error?.message || "Falha ao ler NFC. Aproxime novamente."}`
-                    : nfc.status === "permission-denied"
-                      ? "⚠ Permissão NFC negada. Ative NFC nas configurações."
-                      : nfc.status === "not-supported"
-                        ? "✗ NFC não suportado neste dispositivo/navegador."
-                        : nfc.status === "scanning"
-                          ? "📡 Aguardando aproximação da tag NFC..."
-                          : "Aguardando leitura NFC..."}
+                {isProcessing && identifier
+                  ? `⏳ Processando NFC: ${identifier}...`
+                  : nfc.status === "read-success" && identifier
+                    ? `✓ Leitura OK: ${identifier}`
+                    : nfc.status === "read-error"
+                      ? `✗ ${nfc.error?.message || "Falha ao ler NFC. Aproxime novamente."}`
+                      : nfc.status === "permission-denied"
+                        ? "⚠ Permissão NFC negada. Ative NFC nas configurações."
+                        : nfc.status === "not-supported"
+                          ? "✗ NFC não suportado neste dispositivo/navegador."
+                          : nfc.status === "scanning"
+                            ? "📡 Aguardando aproximação da tag NFC..."
+                            : "Aguardando leitura NFC..."}
               </div>
             ) : null}
 
