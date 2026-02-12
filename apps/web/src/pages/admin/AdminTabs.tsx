@@ -1,9 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
+import { Nfc, Barcode, QrCode, Hash, CreditCard, Wallet, User } from "lucide-react";
 import { apiFetch } from "../../services/api";
 import { formatCurrencyInput, parseCurrencyInput } from "../../utils/currency";
+import { ScannerModal } from "../../components/ScannerModal";
+import { useNfcReader } from "../../hooks/useNfcReader";
 
 interface Tab {
   id: string;
@@ -27,7 +30,15 @@ interface TabItem {
   createdAt: string;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  cpf?: string;
+  phone?: string;
+}
+
 type PaymentMethod = "cash" | "debit" | "credit" | "pix";
+type IdentifierType = "nfc" | "barcode" | "qr" | "manual";
 
 interface PaymentRow {
   method: PaymentMethod;
@@ -35,6 +46,7 @@ interface PaymentRow {
 }
 
 export function AdminTabs() {
+  const [identifierType, setIdentifierType] = useState<IdentifierType>("nfc");
   const [identifier, setIdentifier] = useState("");
   const [type, setType] = useState<"credit" | "prepaid">("prepaid");
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -43,6 +55,9 @@ export function AdminTabs() {
   const [closeError, setCloseError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: "cash", amount: "" }]);
   const [listError, setListError] = useState<string | null>(null);
+  const [nfcDialogOpen, setNfcDialogOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
 
   const tabsQuery = useQuery({
     queryKey: ["tabs"],
@@ -51,7 +66,7 @@ export function AdminTabs() {
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
-    queryFn: () => apiFetch<{ data: Array<{ id: string; name: string }> }>("/api/customers")
+    queryFn: () => apiFetch<{ data: Customer[] }>("/api/customers")
   });
 
   const productsQuery = useQuery({
@@ -89,7 +104,11 @@ export function AdminTabs() {
     },
     onSuccess: () => {
       setIdentifier("");
+      setListError(null);
       tabsQuery.refetch();
+    },
+    onError: (error: Error) => {
+      setListError(error.message);
     }
   });
 
@@ -139,7 +158,7 @@ export function AdminTabs() {
             <body>
               <h1>Recibo Tagflow</h1>
               <p>Comanda: ${tabId}</p>
-              <p>Data: ${new Date().toISOString()}</p>
+              <p>Data: ${new Date().toLocaleString("pt-BR")}</p>
               <table>
                 <thead>
                   <tr><th>Item</th><th>Qtd</th><th>Unit</th><th>Total</th></tr>
@@ -199,9 +218,33 @@ export function AdminTabs() {
     return productName || serviceName || locationName || item.description || "Item";
   };
 
+  const getCustomerInfo = (customerId: string) => {
+    return customersQuery.data?.data?.find((c) => c.id === customerId);
+  };
+
   const paymentSum = payments.reduce((sum, payment) => sum + parseCurrencyInput(payment.amount), 0);
   const paymentRemaining = closeTotal - paymentSum;
   const paymentDiff = Math.abs(paymentRemaining);
+
+  const identifierOptions = [
+    { value: "nfc", label: "NFC", icon: Nfc },
+    { value: "barcode", label: "Codigo", icon: Barcode },
+    { value: "qr", label: "QR Code", icon: QrCode },
+    { value: "manual", label: "Numeracao", icon: Hash }
+  ] as const;
+
+  const handleIdentifierSelect = (type: IdentifierType) => {
+    setIdentifierType(type);
+    if (type === "nfc") {
+      setNfcDialogOpen(true);
+    } else if (type === "barcode") {
+      setScannerMode("barcode");
+      setScannerOpen(true);
+    } else if (type === "qr") {
+      setScannerMode("qr");
+      setScannerOpen(true);
+    }
+  };
 
   return (
     <section className="space-y-4">
@@ -209,112 +252,216 @@ export function AdminTabs() {
         <h2 className="text-2xl font-semibold">Comandas</h2>
         <p className="text-sm text-slate-600">Abra, acompanhe e feche comandas.</p>
       </header>
-      {listError ? <p className="text-sm text-rose-500">{listError}</p> : null}
+      {listError && <p className="text-sm text-rose-500">{listError}</p>}
 
       <div className="rounded-2xl border border-brand-100 bg-white p-4">
-        <h3 className="text-lg font-semibold">Abrir comanda</h3>
+        <h3 className="text-lg font-semibold">Buscar e abrir comanda</h3>
+
+        {/* Seletor de tipo de identificador */}
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {identifierOptions.map((option) => {
+            const active = identifierType === option.value;
+            const isNfc = option.value === "nfc";
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleIdentifierSelect(option.value)}
+                className={`flex aspect-square flex-col items-center justify-center rounded-2xl border px-2 text-xs font-semibold transition ${
+                  active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-brand-100 bg-white text-slate-600"
+                } ${isNfc ? "relative animate-pulse border-emerald-300 bg-emerald-50 text-emerald-700" : ""}`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="mt-1">{option.label}</span>
+                {isNfc && <span className="absolute -top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <input
             value={identifier}
-            onChange={(event) => setIdentifier(event.target.value)}
-            placeholder="NFC, codigo de barras ou numero"
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Digite ou escaneie o identificador"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <select
             value={type}
-            onChange={(event) => setType(event.target.value as "credit" | "prepaid")}
+            onChange={(e) => setType(e.target.value as "credit" | "prepaid")}
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           >
-            <option value="prepaid">Pre-paga</option>
-            <option value="credit">Credito</option>
+            <option value="prepaid">Pre-paga (saldo)</option>
+            <option value="credit">Credito (fiado)</option>
           </select>
-          <Button onClick={() => openMutation.mutate()}>
+          <Button onClick={() => openMutation.mutate()} disabled={!identifier.trim() || openMutation.isPending}>
             {openMutation.isPending ? "Abrindo..." : "Abrir comanda"}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-3">
-        {tabsQuery.data?.data?.map((tab) => (
-          <div key={tab.id} className="rounded-2xl border border-brand-100 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">Comanda {tab.id.slice(0, 6)}</h3>
-                <p className="text-sm text-slate-600">Identificador: {tab.identifierCode}</p>
-                <p className="text-sm text-slate-600">Tipo: {tab.type === "credit" ? "Credito" : "Pre-paga"}</p>
-                <p className="text-sm text-slate-600">Status: {tab.status}</p>
-                <p className="text-xs text-slate-400">
-                  Aberta em {new Date(tab.openedAt).toLocaleString("pt-BR")}
-                </p>
-                {tab.closedAt ? (
-                  <p className="text-xs text-slate-400">
-                    Fechada em {new Date(tab.closedAt).toLocaleString("pt-BR")}
+        {tabsQuery.data?.data?.map((tab) => {
+          const customer = getCustomerInfo(tab.customerId);
+          const isOpen = tab.status === "open";
+          const isCredit = tab.type === "credit";
+
+          return (
+            <div
+              key={tab.id}
+              className={`rounded-2xl border p-4 ${
+                isOpen
+                  ? "border-emerald-200 bg-emerald-50/30"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">
+                      Comanda #{tab.id.slice(0, 8)}
+                    </h3>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      isOpen
+                        ? "bg-emerald-500 text-white"
+                        : "bg-slate-400 text-white"
+                    }`}>
+                      {isOpen ? "ABERTA" : "FECHADA"}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      isCredit
+                        ? "bg-orange-500 text-white"
+                        : "bg-blue-500 text-white"
+                    }`}>
+                      {isCredit ? (
+                        <span className="flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" />
+                          CREDITO
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Wallet className="h-3 w-3" />
+                          PRE-PAGO
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {customer && (
+                    <div className="mt-2 flex items-center gap-1 text-sm text-slate-700">
+                      <User className="h-4 w-4" />
+                      <strong>{customer.name}</strong>
+                      {customer.cpf && <span className="text-slate-500">• CPF: {customer.cpf}</span>}
+                    </div>
+                  )}
+
+                  <p className="mt-1 text-sm text-slate-600">
+                    <strong>Identificador:</strong> {tab.identifierCode}
                   </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => setActiveTabId(activeTabId === tab.id ? null : tab.id)}>
-                  {activeTabId === tab.id ? "Ocultar itens" : "Ver itens"}
-                </Button>
-                {tab.status === "open" ? (
+                  <p className="text-xs text-slate-500">
+                    Aberta em {new Date(tab.openedAt).toLocaleString("pt-BR")}
+                  </p>
+                  {tab.closedAt && (
+                    <p className="text-xs text-slate-500">
+                      Fechada em {new Date(tab.closedAt).toLocaleString("pt-BR")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setListError(null);
-                      if (tab.type === "credit") {
-                        setClosingTab(tab);
-                        return;
-                      }
-                      closeMutation.mutate({ tabId: tab.id });
-                    }}
+                    onClick={() => setActiveTabId(activeTabId === tab.id ? null : tab.id)}
                   >
-                    Fechar comanda
+                    {activeTabId === tab.id ? "Ocultar itens" : "Ver itens"}
                   </Button>
-                ) : null}
+                  {isOpen && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setListError(null);
+                        if (isCredit) {
+                          setClosingTab(tab);
+                          return;
+                        }
+                        closeMutation.mutate({ tabId: tab.id });
+                      }}
+                    >
+                      Fechar comanda
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {activeTabId === tab.id ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <h4 className="text-sm font-semibold text-slate-700">Itens da comanda</h4>
-                {tabDetailsQuery.isLoading ? (
-                  <p className="mt-2 text-sm text-slate-500">Carregando itens...</p>
-                ) : tabDetailsQuery.data?.items?.length ? (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="text-xs uppercase text-slate-400">
-                        <tr>
-                          <th className="py-2 text-left">Item</th>
-                          <th className="py-2 text-left">Qtd</th>
-                          <th className="py-2 text-left">Unitario</th>
-                          <th className="py-2 text-left">Total</th>
-                          <th className="py-2 text-left">Data/Hora</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-slate-600">
-                        {tabDetailsQuery.data.items.map((item) => (
-                          <tr key={item.id} className="border-t border-slate-200">
-                            <td className="py-2">{resolveItemLabel(item)}</td>
-                            <td className="py-2">{item.quantity}</td>
-                            <td className="py-2">R$ {Number(item.unitPrice).toFixed(2)}</td>
-                            <td className="py-2">R$ {Number(item.total).toFixed(2)}</td>
-                            <td className="py-2">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+              {activeTabId === tab.id && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <h4 className="text-sm font-semibold text-slate-700">Itens da comanda</h4>
+                  {tabDetailsQuery.isLoading ? (
+                    <p className="mt-2 text-sm text-slate-500">Carregando itens...</p>
+                  ) : tabDetailsQuery.data?.items?.length ? (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="text-xs uppercase text-slate-400">
+                          <tr>
+                            <th className="py-2 text-left">Item</th>
+                            <th className="py-2 text-left">Qtd</th>
+                            <th className="py-2 text-left">Unitario</th>
+                            <th className="py-2 text-left">Total</th>
+                            <th className="py-2 text-left">Data/Hora</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-500">Nenhum item registrado.</p>
-                )}
-              </div>
-            ) : null}
-          </div>
-        ))}
+                        </thead>
+                        <tbody className="text-slate-600">
+                          {tabDetailsQuery.data.items.map((item) => (
+                            <tr key={item.id} className="border-t border-slate-200">
+                              <td className="py-2">{resolveItemLabel(item)}</td>
+                              <td className="py-2">{item.quantity}</td>
+                              <td className="py-2">R$ {Number(item.unitPrice).toFixed(2)}</td>
+                              <td className="py-2">R$ {Number(item.total).toFixed(2)}</td>
+                              <td className="py-2">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">Nenhum item registrado.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {closingTab ? (
+      {/* NFC Dialog */}
+      {nfcDialogOpen && (
+        <NfcDialog
+          onClose={() => setNfcDialogOpen(false)}
+          onRead={(value) => {
+            setIdentifier(value);
+            setNfcDialogOpen(false);
+          }}
+        />
+      )}
+
+      {/* Scanner Modal */}
+      {scannerOpen && (
+        <ScannerModal
+          open={scannerOpen}
+          mode={scannerMode}
+          onClose={() => setScannerOpen(false)}
+          onScan={(value) => {
+            setIdentifier(value);
+            setScannerOpen(false);
+          }}
+        />
+      )}
+
+      {/* Close Tab Modal */}
+      {closingTab && (
         <Modal
           title="Fechar comanda com pagamento"
           onClose={() => {
@@ -328,11 +475,11 @@ export function AdminTabs() {
               Total da comanda: <strong>R$ {closeTotal.toFixed(2)}</strong>
             </div>
 
-            {!cashOpenQuery.data?.data ? (
+            {!cashOpenQuery.data?.data && (
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
                 Caixa fechado. Abra o caixa para concluir o pagamento.
               </div>
-            ) : null}
+            )}
 
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-slate-700">Formas de pagamento</h4>
@@ -340,8 +487,8 @@ export function AdminTabs() {
                 <div key={`${payment.method}-${index}`} className="grid gap-2 sm:grid-cols-3">
                   <select
                     value={payment.method}
-                    onChange={(event) => {
-                      const value = event.target.value as PaymentMethod;
+                    onChange={(e) => {
+                      const value = e.target.value as PaymentMethod;
                       setPayments((prev) => prev.map((p, i) => (i === index ? { ...p, method: value } : p)));
                     }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2"
@@ -353,8 +500,8 @@ export function AdminTabs() {
                   </select>
                   <input
                     value={payment.amount}
-                    onChange={(event) => {
-                      const value = formatCurrencyInput(event.target.value);
+                    onChange={(e) => {
+                      const value = formatCurrencyInput(e.target.value);
                       setPayments((prev) => prev.map((p, i) => (i === index ? { ...p, amount: value } : p)));
                     }}
                     placeholder="Valor"
@@ -383,7 +530,7 @@ export function AdminTabs() {
               </span>
             </div>
 
-            {closeError ? <p className="text-sm text-rose-500">{closeError}</p> : null}
+            {closeError && <p className="text-sm text-rose-500">{closeError}</p>}
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -418,8 +565,63 @@ export function AdminTabs() {
             </div>
           </div>
         </Modal>
-      ) : null}
+      )}
     </section>
+  );
+}
+
+function NfcDialog({ onClose, onRead }: { onClose: () => void; onRead: (value: string) => void }) {
+  if (typeof document === "undefined") return null;
+  const nfc = useNfcReader();
+  const lastReadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    nfc.clear();
+    nfc.start();
+    return () => nfc.stop();
+  }, []);
+
+  useEffect(() => {
+    if (!nfc.data) return;
+    if (lastReadRef.current === nfc.data) return;
+    lastReadRef.current = nfc.data;
+    onRead(nfc.data);
+  }, [nfc.data, onRead]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-5 text-center shadow-lg">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+          <span className="absolute inline-flex h-16 w-16 animate-ping rounded-full bg-emerald-200 opacity-70" />
+          <Nfc className="relative h-8 w-8" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold text-slate-900">Aguardando NFC</h3>
+        <p className="mt-2 text-sm text-slate-600">Aproxime a pulseira/cartao para ler o identificador.</p>
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+            nfc.status === "lido"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : nfc.status === "detectado"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : nfc.status.includes("erro")
+                  ? "border-rose-200 bg-rose-50 text-rose-600"
+                  : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}
+        >
+          {nfc.status === "lido" && nfc.data
+            ? `Leitura OK: ${nfc.data}`
+            : nfc.status === "detectado"
+              ? "NFC detectado, mas o identificador nao foi lido. Tente outro cartao."
+              : nfc.status.includes("erro")
+                ? "Falha ao ler NFC. Tente novamente."
+                : "Aguardando leitura NFC..."}
+        </div>
+        <Button className="mt-4 w-full" variant="outline" onClick={onClose}>
+          Fechar
+        </Button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
