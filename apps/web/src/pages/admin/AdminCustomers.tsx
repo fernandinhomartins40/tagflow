@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../components/ui/button";
 import { Nfc, Barcode, QrCode, Hash } from "lucide-react";
 import { apiFetch } from "../../services/api";
@@ -8,20 +10,104 @@ import { ScannerModal } from "../../components/ScannerModal";
 import { AddCreditModal, type PaymentMethod } from "../../components/AddCreditModal";
 import { useNfcReader } from "../../hooks/useNfcReader";
 import { PlanLimitsDisplay } from "../../components/PlanLimitsDisplay";
+import { createCustomerSchema, type CreateCustomerInput } from "../../schemas/customer";
 import type { Customer, Branch, PaginatedResponse } from "../../types/api";
+
+// Funções de máscara
+const maskCpf = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const maskPhone = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const maskDate = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const formatCurrency = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  const number = Number(digits) / 100;
+  return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};
+
+const formatDateDisplay = (value: string | null | undefined): string => {
+  if (!value) return "-";
+  if (value.includes("/")) return value;
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+};
+
+const formatCurrencyDisplay = (value: number | string | null | undefined): string => {
+  const num = typeof value === "string" ? parseFloat(value) || 0 : value || 0;
+  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};
+
+// Validação de CPF
+const isValidCpf = (cpfValue: string): boolean => {
+  const digits = cpfValue.replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(digits[i]) * (10 - i);
+  }
+  let digit = 11 - (sum % 11);
+  if (digit >= 10) digit = 0;
+  if (digit !== parseInt(digits[9])) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(digits[i]) * (11 - i);
+  }
+  digit = 11 - (sum % 11);
+  if (digit >= 10) digit = 0;
+  return digit === parseInt(digits[10]);
+};
 
 export function AdminCustomers() {
   const queryClient = useQueryClient();
 
-  // Estados do formulário
-  const [name, setName] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [creditLimit, setCreditLimit] = useState("");
-  const [branchId, setBranchId] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  // Estado para campos com máscara
+  const [cpfMasked, setCpfMasked] = useState("");
+  const [phoneMasked, setPhoneMasked] = useState("");
+  const [birthDateMasked, setBirthDateMasked] = useState("");
+  const [creditLimitMasked, setCreditLimitMasked] = useState("");
+
+  // React Hook Form com validação Zod
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm<CreateCustomerInput>({
+    resolver: zodResolver(createCustomerSchema),
+    defaultValues: {
+      name: "",
+      cpf: "",
+      phone: "",
+      email: "",
+      birthDate: "",
+      creditLimit: 0,
+      branchId: ""
+    }
+  });
 
   // Queries
   const customersQuery = useQuery({
@@ -36,26 +122,22 @@ export function AdminCustomers() {
 
   // Mutation para criar cliente
   const createMutation = useMutation({
-    mutationFn: async () => {
-      // Remover máscaras - apenas dígitos
-      const cpfDigits = cpf.replace(/\D/g, "");
-      const phoneDigits = phone.replace(/\D/g, "");
-
-      // Construir payload básico com campos obrigatórios
-      const payload: Record<string, any> = {
-        name: name.trim(),
-        cpf: cpfDigits,
-        phone: phoneDigits
+    mutationFn: async (data: CreateCustomerInput) => {
+      // Remover máscaras e preparar dados
+      const payload: any = {
+        name: data.name.trim(),
+        cpf: data.cpf.replace(/\D/g, ""),
+        phone: data.phone.replace(/\D/g, "")
       };
 
       // Adicionar email apenas se preenchido
-      if (email.trim()) {
-        payload.email = email.trim();
+      if (data.email && data.email.trim()) {
+        payload.email = data.email.trim();
       }
 
-      // Adicionar birthDate apenas se preenchido e válido
-      if (birthDate.trim()) {
-        const dateDigits = birthDate.replace(/\D/g, "");
+      // Converter birthDate para ISO format
+      if (data.birthDate && data.birthDate.trim()) {
+        const dateDigits = data.birthDate.replace(/\D/g, "");
         if (dateDigits.length === 8) {
           const day = dateDigits.slice(0, 2);
           const month = dateDigits.slice(2, 4);
@@ -64,55 +146,34 @@ export function AdminCustomers() {
         }
       }
 
-      // Adicionar creditLimit apenas se preenchido
-      if (creditLimit.trim()) {
-        const limitDigits = creditLimit.replace(/\D/g, "");
-        if (limitDigits) {
-          payload.creditLimit = Number(limitDigits) / 100;
-        }
+      // Adicionar creditLimit se maior que 0
+      if (data.creditLimit && data.creditLimit > 0) {
+        payload.creditLimit = data.creditLimit;
       }
 
-      // Adicionar branchId apenas se selecionado
-      if (branchId && branchId !== "") {
-        payload.branchId = branchId;
+      // Adicionar branchId se preenchido
+      if (data.branchId && data.branchId !== "") {
+        payload.branchId = data.branchId;
       }
 
-      console.log("=== PAYLOAD CRIACAO CLIENTE ===");
+      console.log("=== REACT HOOK FORM PAYLOAD ===");
       console.log(JSON.stringify(payload, null, 2));
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/customers`, {
+      return apiFetch<Customer>("/api/customers", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Tenant-Id": localStorage.getItem("tenantId") || ""
-        },
-        credentials: "include",
         body: JSON.stringify(payload)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || "Erro ao criar cliente");
-      }
-
-      return response.json();
     },
     onSuccess: () => {
       // Limpar formulário
-      setName("");
-      setCpf("");
-      setBirthDate("");
-      setPhone("");
-      setEmail("");
-      setCreditLimit("");
-      setBranchId("");
-      setFormError(null);
+      reset();
+      setCpfMasked("");
+      setPhoneMasked("");
+      setBirthDateMasked("");
+      setCreditLimitMasked("");
 
-      // Recarregar lista de clientes
+      // Recarregar lista
       queryClient.invalidateQueries({ queryKey: ["customers"] });
-    },
-    onError: (error: Error) => {
-      setFormError(error.message);
     }
   });
 
@@ -138,115 +199,57 @@ export function AdminCustomers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] })
   });
 
-  // Funções de máscara
-  const maskCpf = (value: string): string => {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-    if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-  };
-
-  const maskPhone = (value: string): string => {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  };
-
-  const maskDate = (value: string): string => {
-    const digits = value.replace(/\D/g, "").slice(0, 8);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-  };
-
-  const formatCurrency = (value: string): string => {
+  // Handlers de mudança com máscara
+  const handleCpfChange = (value: string) => {
+    const masked = maskCpf(value);
+    setCpfMasked(masked);
     const digits = value.replace(/\D/g, "");
-    if (!digits) return "";
-    const number = Number(digits) / 100;
-    return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    setValue("cpf", digits, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
   };
 
-  // Validação de CPF
-  const isValidCpf = (cpfValue: string): boolean => {
-    const digits = cpfValue.replace(/\D/g, "");
-    if (digits.length !== 11) return false;
-    if (/^(\d)\1{10}$/.test(digits)) return false;
-
-    let sum = 0;
-    for (let i = 0; i < 9; i++) {
-      sum += parseInt(digits[i]) * (10 - i);
-    }
-    let digit = 11 - (sum % 11);
-    if (digit >= 10) digit = 0;
-    if (digit !== parseInt(digits[9])) return false;
-
-    sum = 0;
-    for (let i = 0; i < 10; i++) {
-      sum += parseInt(digits[i]) * (11 - i);
-    }
-    digit = 11 - (sum % 11);
-    if (digit >= 10) digit = 0;
-    if (digit !== parseInt(digits[10])) return false;
-
-    return true;
+  const handlePhoneChange = (value: string) => {
+    const masked = maskPhone(value);
+    setPhoneMasked(masked);
+    const digits = value.replace(/\D/g, "");
+    setValue("phone", digits, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
   };
 
-  // Validação de telefone
-  const isValidPhone = (phoneValue: string): boolean => {
-    const digits = phoneValue.replace(/\D/g, "");
-    return digits.length >= 10;
+  const handleBirthDateChange = (value: string) => {
+    const masked = maskDate(value);
+    setBirthDateMasked(masked);
+    setValue("birthDate", masked, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
   };
 
-  // Validação de email
-  const isValidEmail = (emailValue: string): boolean => {
-    if (!emailValue.trim()) return true; // Email é opcional
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(emailValue);
+  const handleCreditLimitChange = (value: string) => {
+    const masked = formatCurrency(value);
+    setCreditLimitMasked(masked);
+    const digits = value.replace(/\D/g, "");
+    const amount = digits ? Number(digits) / 100 : 0;
+    setValue("creditLimit", amount, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
   };
 
-  // Handler do submit
-  const handleSubmit = () => {
-    // Validações
-    if (!name.trim()) {
-      setFormError("Informe o nome do cliente.");
+  // Submit handler
+  const onSubmit = handleSubmit(async (data) => {
+    // Validação adicional de CPF
+    if (!isValidCpf(data.cpf)) {
+      console.error("CPF inválido:", data.cpf);
       return;
     }
 
-    if (!isValidCpf(cpf)) {
-      setFormError("CPF inválido. Verifique os dígitos verificadores.");
-      return;
-    }
-
-    if (!isValidPhone(phone)) {
-      setFormError("Informe um telefone válido com pelo menos 10 dígitos.");
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      setFormError("Email inválido.");
-      return;
-    }
-
-    setFormError(null);
-    createMutation.mutate();
-  };
-
-  // Formatar valores para exibição
-  const formatDateDisplay = (value: string | null | undefined): string => {
-    if (!value) return "-";
-    if (value.includes("/")) return value;
-    const [year, month, day] = value.split("-");
-    if (!year || !month || !day) return value;
-    return `${day}/${month}/${year}`;
-  };
-
-  const formatCurrencyDisplay = (value: number | string | null | undefined): string => {
-    const num = typeof value === "string" ? parseFloat(value) || 0 : value || 0;
-    return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  };
+    await createMutation.mutateAsync(data);
+  });
 
   return (
     <section className="space-y-4">
@@ -260,69 +263,93 @@ export function AdminCustomers() {
 
       <PlanLimitsDisplay resource="customers" />
 
-      <div className="rounded-2xl border border-brand-100 bg-white p-4">
+      <form onSubmit={onSubmit} className="rounded-2xl border border-brand-100 bg-white p-4">
         <h3 className="text-lg font-semibold">Novo cliente</h3>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nome *"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          <input
-            value={cpf}
-            onChange={(e) => setCpf(maskCpf(e.target.value))}
-            placeholder="CPF *"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          <input
-            value={birthDate}
-            onChange={(e) => setBirthDate(maskDate(e.target.value))}
-            placeholder="Nascimento (DD/MM/AAAA)"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          <input
-            value={phone}
-            onChange={(e) => setPhone(maskPhone(e.target.value))}
-            placeholder="Telefone/WhatsApp *"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email (opcional)"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          <input
-            value={creditLimit}
-            onChange={(e) => setCreditLimit(formatCurrency(e.target.value))}
-            placeholder="Limite de crédito (pós-pago)"
-            className="w-full rounded-xl border border-brand-100 px-3 py-2"
-          />
-          {branchesQuery.data?.data && branchesQuery.data.data.length > 0 && (
-            <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
+          <div>
+            <input
+              {...register("name")}
+              placeholder="Nome *"
               className="w-full rounded-xl border border-brand-100 px-3 py-2"
-            >
-              <option value="">Todas as filiais</option>
-              {branchesQuery.data.data.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            />
+            {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
+          </div>
+
+          <div>
+            <input
+              value={cpfMasked}
+              onChange={(e) => handleCpfChange(e.target.value)}
+              placeholder="CPF *"
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            />
+            {errors.cpf && <p className="mt-1 text-xs text-rose-500">{errors.cpf.message}</p>}
+          </div>
+
+          <div>
+            <input
+              value={birthDateMasked}
+              onChange={(e) => handleBirthDateChange(e.target.value)}
+              placeholder="Nascimento (DD/MM/AAAA)"
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            />
+            {errors.birthDate && <p className="mt-1 text-xs text-rose-500">{errors.birthDate.message}</p>}
+          </div>
+
+          <div>
+            <input
+              value={phoneMasked}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              placeholder="Telefone/WhatsApp *"
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            />
+            {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
+          </div>
+
+          <div>
+            <input
+              {...register("email")}
+              placeholder="Email (opcional)"
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            />
+            {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
+          </div>
+
+          <div>
+            <input
+              value={creditLimitMasked}
+              onChange={(e) => handleCreditLimitChange(e.target.value)}
+              placeholder="Limite de crédito (pós-pago)"
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            />
+            {errors.creditLimit && <p className="mt-1 text-xs text-rose-500">{errors.creditLimit.message}</p>}
+          </div>
+
+          {branchesQuery.data?.data && branchesQuery.data.data.length > 0 && (
+            <div>
+              <select
+                {...register("branchId")}
+                className="w-full rounded-xl border border-brand-100 px-3 py-2"
+              >
+                <option value="">Todas as filiais</option>
+                {branchesQuery.data.data.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              {errors.branchId && <p className="mt-1 text-xs text-rose-500">{errors.branchId.message}</p>}
+            </div>
           )}
         </div>
-        {formError && <p className="mt-3 text-sm text-rose-500">{formError}</p>}
+
         <Button
+          type="submit"
           className="mt-3"
-          onClick={handleSubmit}
-          disabled={createMutation.isPending}
+          disabled={isSubmitting || createMutation.isPending}
         >
-          {createMutation.isPending ? "Salvando..." : "Adicionar cliente"}
+          {isSubmitting || createMutation.isPending ? "Salvando..." : "Adicionar cliente"}
         </Button>
-      </div>
+      </form>
 
       <div className="grid gap-4">
         {customersQuery.data?.data?.map((customer) => (

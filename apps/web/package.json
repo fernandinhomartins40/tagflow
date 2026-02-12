@@ -9,6 +9,7 @@
     "lint": "echo 'lint not configured'"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.1.0",
     "@tanstack/react-query": "^5.59.0",
     "@tanstack/react-query-devtools": "^5.59.0",
@@ -23,9 +24,11 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-easy-crop": "^5.5.6",
+    "react-hook-form": "^7.71.1",
     "react-router-dom": "^6.26.1",
     "tailwind-merge": "^2.5.2",
     "xlsx": "^0.18.5",
+    "zod": "^4.3.6",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
