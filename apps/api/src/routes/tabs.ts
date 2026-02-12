@@ -8,8 +8,7 @@ import { validateFeatureAccess } from "../utils/planValidation";
 
 const openSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
-  identifier: z.string().min(3),
-  type: z.enum(["credit", "prepaid"]).optional()
+  identifier: z.string().min(3)
 });
 
 const itemSchema = z.object({
@@ -77,7 +76,8 @@ tabsRoutes.post("/open", async (c) => {
     return c.json(openTab);
   }
 
-  const tabType = body.type ?? identifierRow.identifier.tabType ?? "prepaid";
+  // Sempre usar o tipo configurado no identificador
+  const tabType = identifierRow.identifier.tabType ?? "prepaid";
 
   const [created] = await db
     .insert(tabs)
@@ -85,6 +85,7 @@ tabsRoutes.post("/open", async (c) => {
       companyId: tenantId,
       branchId: body.branchId ?? undefined,
       customerId: identifierRow.customer.id,
+      identifierId: identifierRow.identifier.id,
       identifierCode: body.identifier,
       type: tabType,
       status: "open"

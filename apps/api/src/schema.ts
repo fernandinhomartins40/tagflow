@@ -207,6 +207,7 @@ export const tabs = pgTable("tabs", {
   companyId: uuid("company_id").notNull(),
   branchId: uuid("branch_id"),
   customerId: uuid("customer_id").notNull(),
+  identifierId: uuid("identifier_id").references(() => customerIdentifiers.id),
   identifierCode: text("identifier_code").notNull(),
   type: text("type").notNull(), // credit | prepaid
   status: text("status").notNull(), // open | closed

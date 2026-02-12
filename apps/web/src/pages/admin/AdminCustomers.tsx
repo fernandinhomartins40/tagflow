@@ -190,13 +190,16 @@ export function AdminCustomers() {
 
   // Mutation para vincular identificador
   const linkIdentifierMutation = useMutation({
-    mutationFn: async ({ id, type, code }: { id: string; type: string; code: string }) => {
+    mutationFn: async ({ id, type, code, tabType }: { id: string; type: string; code: string; tabType: string }) => {
       return apiFetch(`/api/customers/${id}/activate-tag`, {
         method: "POST",
-        body: JSON.stringify({ type, code })
+        body: JSON.stringify({ type, code, tabType })
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-identifiers"] });
+    }
   });
 
   // Handlers de mudança com máscara
@@ -372,7 +375,7 @@ export function AdminCustomers() {
             </div>
             <IdentifierLinker
               customerId={customer.id}
-              onLink={(type, code) => linkIdentifierMutation.mutate({ id: customer.id, type, code })}
+              onLink={(type, code, tabType) => linkIdentifierMutation.mutate({ id: customer.id, type, code, tabType })}
             />
           </div>
         ))}
@@ -381,12 +384,22 @@ export function AdminCustomers() {
   );
 }
 
-function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: (type: string, code: string) => void }) {
+function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: (type: string, code: string, tabType: string) => void }) {
   const [type, setType] = useState<"nfc" | "barcode" | "qr" | "manual">("nfc");
   const [code, setCode] = useState("");
+  const [tabType, setTabType] = useState<"prepaid" | "credit">("prepaid");
   const [nfcDialogOpen, setNfcDialogOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
+
+  // Query para buscar identificadores vinculados
+  const identifiersQuery = useQuery({
+    queryKey: ["customer-identifiers", customerId],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/customers/${customerId}/identifiers`);
+      return res.json();
+    }
+  });
 
   const options = [
     { value: "nfc", label: "NFC", icon: Nfc },
@@ -431,21 +444,82 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
           );
         })}
       </div>
+
+      {/* Seletor de tipo de comanda */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-slate-700">Tipo de comanda:</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setTabType("prepaid")}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+              tabType === "prepaid"
+                ? "border-blue-500 bg-blue-50 text-blue-700"
+                : "border-slate-200 bg-white text-slate-600"
+            }`}
+          >
+            Pré-pago
+          </button>
+          <button
+            type="button"
+            onClick={() => setTabType("credit")}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+              tabType === "credit"
+                ? "border-purple-500 bg-purple-50 text-purple-700"
+                : "border-slate-200 bg-white text-slate-600"
+            }`}
+          >
+            Crédito
+          </button>
+        </div>
+      </div>
+
       <input
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder={`Codigo para ${customerId.slice(0, 6)}...`}
         className="w-full rounded-xl border border-brand-100 px-3 py-2"
       />
-      <Button size="sm" onClick={() => onLink(type, code)}>
+      <Button size="sm" onClick={() => onLink(type, code, tabType)}>
         Vincular
       </Button>
+
+      {/* Lista de identificadores vinculados */}
+      {identifiersQuery.data?.identifiers && identifiersQuery.data.identifiers.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-medium text-slate-700">Identificadores vinculados:</p>
+          <div className="space-y-1">
+            {identifiersQuery.data.identifiers.map((identifier: any) => (
+              <div
+                key={identifier.id}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-slate-200 px-2 py-0.5 text-xs font-mono text-slate-700">
+                    {identifier.type.toUpperCase()}
+                  </span>
+                  <span className="text-sm text-slate-900">{identifier.code}</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    identifier.tabType === "credit"
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-blue-100 text-blue-700"
+                  }`}
+                >
+                  {identifier.tabType === "credit" ? "Crédito" : "Pré-pago"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {nfcDialogOpen && (
         <NfcDialog
           onClose={() => setNfcDialogOpen(false)}
           onRead={(value) => {
             setCode(value);
-            onLink(type, value);
+            onLink(type, value, tabType);
             setNfcDialogOpen(false);
           }}
         />

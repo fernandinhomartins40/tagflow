@@ -303,6 +303,13 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
     .where(and(eq(customerIdentifiers.companyId, tenantId), eq(customerIdentifiers.code, body.code)));
 
   if (existing) {
+    // Validar se o código já está ativo em outro cliente
+    if (existing.active && existing.customerId !== id) {
+      return c.json({
+        error: "Código já vinculado",
+        message: "Este código de identificador já está vinculado a outro cliente ativo."
+      }, 409);
+    }
     const [updated] = await db
       .update(customerIdentifiers)
       .set({
@@ -333,10 +340,9 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
           companyId: tenantId,
           customerId: id,
           identifierId: updated.id,
+          identifierCode: updated.code,
           type: updated.tabType,
-          status: "open",
-          totalAmount: 0,
-          paidAmount: 0
+          status: "open"
         })
         .returning();
       return c.json({ identifier: updated, tab }, 200);
@@ -365,14 +371,25 @@ customersRoutes.post("/:id/activate-tag", async (c) => {
       companyId: tenantId,
       customerId: id,
       identifierId: created.id,
+      identifierCode: created.code,
       type: created.tabType,
-      status: "open",
-      totalAmount: 0,
-      paidAmount: 0
+      status: "open"
     })
     .returning();
 
   return c.json({ identifier: created, tab }, 201);
+});
+
+customersRoutes.get("/:id/identifiers", async (c) => {
+  const tenantId = getTenantId(c);
+  const id = c.req.param("id");
+
+  const identifiers = await db
+    .select()
+    .from(customerIdentifiers)
+    .where(and(eq(customerIdentifiers.companyId, tenantId), eq(customerIdentifiers.customerId, id)));
+
+  return c.json({ identifiers }, 200);
 });
 
 customersRoutes.post("/:id/add-credits", async (c) => {
