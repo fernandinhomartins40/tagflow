@@ -83,8 +83,14 @@ customersRoutes.get("/", async (c) => {
 
 customersRoutes.post("/", async (c) => {
   try {
+    // PRIMEIRO: Capturar o body ANTES de qualquer coisa
+    const rawBody = await c.req.json();
+    console.log("============ RAW BODY RECEIVED ============");
+    console.log(JSON.stringify(rawBody, null, 2));
+    console.log("===========================================");
+
     const tenantId = getTenantId(c);
-    logger.request("POST", "/api/customers", { tenantId });
+    logger.request("POST", "/api/customers", { tenantId, bodyKeys: Object.keys(rawBody) });
 
     // Check plan limits before creating
     logger.debug("Checking plan limits", "CUSTOMERS", { tenantId });
@@ -96,7 +102,6 @@ customersRoutes.post("/", async (c) => {
 
     // Parse and validate request body
     logger.debug("Parsing request body", "CUSTOMERS");
-    const rawBody = await c.req.json();
     logger.debug("Raw body received", "CUSTOMERS", rawBody);
     logger.debug("Raw body field types", "CUSTOMERS", {
       name: typeof rawBody.name,
