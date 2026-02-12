@@ -85,16 +85,29 @@ export const getPlanLimits = (planName: string, limits?: string | null): PlanLim
 };
 
 export const getCompanyPlanLimits = async (companyId: string): Promise<PlanLimits> => {
+  // Validar companyId antes de fazer query
+  if (!companyId || typeof companyId !== 'string') {
+    console.error(`[PLAN_LIMITS] Invalid companyId:`, companyId);
+    return DEFAULT_LIMITS.Free;
+  }
+
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   if (!company) {
-    throw new Error(`Empresa não encontrada (ID: ${companyId}). Verifique se o tenant está correto.`);
+    console.error(`[PLAN_LIMITS] Company not found: ${companyId}`);
+    return DEFAULT_LIMITS.Free;
   }
 
   // Se não tiver plano definido, usa "Free" como padrão
-  const planName = company.plan || "Free";
+  let planName: string = "Free";
 
-  // Validar se o planName não é undefined/null antes de fazer a query
-  if (!planName || typeof planName !== 'string') {
+  if (company.plan && typeof company.plan === 'string' && company.plan.trim() !== '') {
+    planName = company.plan.trim();
+  } else {
+    console.warn(`[PLAN_LIMITS] Company ${companyId} has no plan set, using Free as default`);
+  }
+
+  // GARANTIR que planName seja string válida antes de query
+  if (!planName || typeof planName !== 'string' || planName.trim() === '') {
     console.error(`[PLAN_LIMITS] Invalid plan name for company ${companyId}:`, planName);
     return DEFAULT_LIMITS.Free;
   }
