@@ -69,8 +69,9 @@ export function AdminCustomers() {
 
       if (branchId) payload.branchId = branchId;
 
-      console.log("[DEBUG] Payload being sent:", payload);
-      console.log("[DEBUG] Payload types:", {
+      console.log("=== DEBUG CUSTOMER CREATE ===");
+      console.log("[DEBUG] Payload sendo enviado:", JSON.stringify(payload, null, 2));
+      console.log("[DEBUG] Tipos dos campos:", {
         name: typeof payload.name,
         cpf: typeof payload.cpf,
         phone: typeof payload.phone,
@@ -78,6 +79,12 @@ export function AdminCustomers() {
         birthDate: typeof payload.birthDate,
         creditLimit: typeof payload.creditLimit,
         branchId: typeof payload.branchId
+      });
+      console.log("[DEBUG] Valores raw dos campos opcionais:", {
+        emailRaw: email,
+        birthDateRaw: birthDate,
+        creditLimitRaw: creditLimit,
+        branchIdRaw: branchId
       });
 
       return apiFetch<Customer>("/api/customers", {
