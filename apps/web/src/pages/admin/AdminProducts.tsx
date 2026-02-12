@@ -223,7 +223,18 @@ export function AdminProducts() {
               </div>
             </div>
             {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name} className="mt-2 h-20 w-full rounded-xl object-cover" />
+              <img
+                src={product.imageUrlSmall || product.imageUrl}
+                srcSet={
+                  product.imageUrlSmall && product.imageUrlMedium && product.imageUrl
+                    ? `${product.imageUrlSmall} 128w, ${product.imageUrlMedium} 256w, ${product.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 128px, 256px"
+                alt={product.name}
+                className="mt-2 h-20 w-full rounded-xl object-cover"
+                loading="lazy"
+              />
             ) : null}
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -257,7 +268,17 @@ export function AdminProducts() {
         <Modal title="Detalhes do produto" onClose={() => setViewProduct(null)}>
           <div className="space-y-3">
             {viewProduct.imageUrl ? (
-              <img src={viewProduct.imageUrl} alt={viewProduct.name} className="h-40 w-full rounded-2xl object-cover" />
+              <img
+                src={viewProduct.imageUrlMedium || viewProduct.imageUrl}
+                srcSet={
+                  viewProduct.imageUrlSmall && viewProduct.imageUrlMedium && viewProduct.imageUrl
+                    ? `${viewProduct.imageUrlSmall} 128w, ${viewProduct.imageUrlMedium} 256w, ${viewProduct.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 256px, 512px"
+                alt={viewProduct.name}
+                className="h-40 w-full rounded-2xl object-cover"
+              />
             ) : null}
             <div>
               <p className="text-lg font-semibold">{viewProduct.name}</p>

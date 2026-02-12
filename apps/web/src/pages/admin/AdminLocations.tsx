@@ -343,7 +343,18 @@ export function AdminLocations() {
               </div>
             </div>
             {location.imageUrl ? (
-              <img src={location.imageUrl} alt={location.name} className="mt-2 h-20 w-full rounded-xl object-cover" />
+              <img
+                src={location.imageUrlSmall || location.imageUrl}
+                srcSet={
+                  location.imageUrlSmall && location.imageUrlMedium && location.imageUrl
+                    ? `${location.imageUrlSmall} 128w, ${location.imageUrlMedium} 256w, ${location.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 128px, 256px"
+                alt={location.name}
+                className="mt-2 h-20 w-full rounded-xl object-cover"
+                loading="lazy"
+              />
             ) : null}
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -384,7 +395,17 @@ export function AdminLocations() {
         <Modal title="Detalhes do local" onClose={() => setViewLocation(null)}>
           <div className="space-y-3">
             {viewLocation.imageUrl ? (
-              <img src={viewLocation.imageUrl} alt={viewLocation.name} className="h-40 w-full rounded-2xl object-cover" />
+              <img
+                src={viewLocation.imageUrlMedium || viewLocation.imageUrl}
+                srcSet={
+                  viewLocation.imageUrlSmall && viewLocation.imageUrlMedium && viewLocation.imageUrl
+                    ? `${viewLocation.imageUrlSmall} 128w, ${viewLocation.imageUrlMedium} 256w, ${viewLocation.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 256px, 512px"
+                alt={viewLocation.name}
+                className="h-40 w-full rounded-2xl object-cover"
+              />
             ) : null}
             <div>
               <p className="text-lg font-semibold">{viewLocation.name}</p>

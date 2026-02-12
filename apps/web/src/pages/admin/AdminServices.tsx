@@ -232,7 +232,18 @@ export function AdminServices() {
               </div>
             </div>
             {service.imageUrl ? (
-              <img src={service.imageUrl} alt={service.name} className="mt-2 h-20 w-full rounded-xl object-cover" />
+              <img
+                src={service.imageUrlSmall || service.imageUrl}
+                srcSet={
+                  service.imageUrlSmall && service.imageUrlMedium && service.imageUrl
+                    ? `${service.imageUrlSmall} 128w, ${service.imageUrlMedium} 256w, ${service.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 128px, 256px"
+                alt={service.name}
+                className="mt-2 h-20 w-full rounded-xl object-cover"
+                loading="lazy"
+              />
             ) : null}
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -267,7 +278,17 @@ export function AdminServices() {
         <Modal title="Detalhes do servico" onClose={() => setViewService(null)}>
           <div className="space-y-3">
             {viewService.imageUrl ? (
-              <img src={viewService.imageUrl} alt={viewService.name} className="h-40 w-full rounded-2xl object-cover" />
+              <img
+                src={viewService.imageUrlMedium || viewService.imageUrl}
+                srcSet={
+                  viewService.imageUrlSmall && viewService.imageUrlMedium && viewService.imageUrl
+                    ? `${viewService.imageUrlSmall} 128w, ${viewService.imageUrlMedium} 256w, ${viewService.imageUrl} 512w`
+                    : undefined
+                }
+                sizes="(max-width: 768px) 256px, 512px"
+                alt={viewService.name}
+                className="h-40 w-full rounded-2xl object-cover"
+              />
             ) : null}
             <div>
               <p className="text-lg font-semibold">{viewService.name}</p>

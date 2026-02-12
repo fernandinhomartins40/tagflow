@@ -92,6 +92,52 @@ services:
     networks:
       - tagflow
 
+  backup:
+    image: alpine:latest
+    container_name: tagflow-backup
+    restart: "no"
+    volumes:
+      - uploads_data:/data/uploads:ro
+      - postgres_data:/data/postgres:ro
+      - ./backups:/backups
+    command: |
+      sh -c '
+        echo "[BACKUP] Starting backup process at $$(date)"
+
+        # Create backup directory if not exists
+        mkdir -p /backups
+
+        # Backup uploads with timestamp
+        TIMESTAMP=$$(date +%Y%m%d_%H%M%S)
+        UPLOADS_BACKUP="/backups/uploads_$${TIMESTAMP}.tar.gz"
+
+        echo "[BACKUP] Creating uploads backup: $${UPLOADS_BACKUP}"
+        tar czf "$${UPLOADS_BACKUP}" -C /data uploads/ 2>&1
+
+        if [ $$? -eq 0 ]; then
+          echo "[BACKUP] Uploads backup created successfully"
+          echo "[BACKUP] Size: $$(du -h "$${UPLOADS_BACKUP}" | cut -f1)"
+        else
+          echo "[BACKUP] ERROR: Failed to create uploads backup"
+          exit 1
+        fi
+
+        # Cleanup old backups (keep last 7 days)
+        echo "[BACKUP] Cleaning up old backups (keeping last 7 days)"
+        find /backups -name "uploads_*.tar.gz" -mtime +7 -delete
+
+        echo "[BACKUP] Backup process completed at $$(date)"
+        echo "[BACKUP] Available backups:"
+        ls -lh /backups/uploads_*.tar.gz 2>/dev/null || echo "No backups found"
+      '
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - tagflow
+    profiles:
+      - backup
+
 volumes:
   postgres_data:
     name: tagflow_postgres_data

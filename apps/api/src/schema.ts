@@ -118,6 +118,8 @@ export const products = pgTable("products", {
   stock: integer("stock").default(0).notNull(),
   active: boolean("active").default(true).notNull(),
   imageUrl: text("image_url"),
+  imageUrlMedium: text("image_url_medium"),
+  imageUrlSmall: text("image_url_small"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
@@ -129,6 +131,8 @@ export const services = pgTable("services", {
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
   unit: text("unit").notNull(),
   imageUrl: text("image_url"),
+  imageUrlMedium: text("image_url_medium"),
+  imageUrlSmall: text("image_url_small"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -144,6 +148,8 @@ export const locations = pgTable("locations", {
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
   priceUnit: text("price_unit").notNull().default("hour"),
   imageUrl: text("image_url"),
+  imageUrlMedium: text("image_url_medium"),
+  imageUrlSmall: text("image_url_small"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });

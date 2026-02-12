@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { join } from "node:path";
+import { unlink } from "node:fs/promises";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { logger } from "./utils/logger";
@@ -57,6 +58,42 @@ app.use("/public/*", tenantMiddleware);
 // === Public Routes (sem autenticação) ===
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.get("/health/storage", async (c) => {
+  const testFile = "/app/uploads/.healthcheck";
+
+  try {
+    // Testar escrita
+    await Bun.write(testFile, "healthcheck-ok");
+
+    // Testar leitura
+    const content = await Bun.file(testFile).text();
+
+    if (content !== "healthcheck-ok") {
+      throw new Error("Storage read verification failed");
+    }
+
+    // Limpar arquivo de teste
+    await unlink(testFile);
+
+    return c.json({
+      status: "healthy",
+      storage: "read/write operational",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Storage healthcheck failed:", error);
+    return c.json(
+      {
+        status: "unhealthy",
+        storage: "read/write failed",
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      },
+      503
+    );
+  }
+});
 
 app.get("/uploads/:tenant/:file", (c) => {
   const tenant = c.req.param("tenant");

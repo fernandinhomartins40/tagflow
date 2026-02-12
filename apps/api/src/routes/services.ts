@@ -5,6 +5,12 @@ import { join } from "node:path";
 import { db } from "../db";
 import { services } from "../schema";
 import { ensureUploadDir } from "../utils/uploads";
+import {
+  generateThumbnails,
+  validateMimeType,
+  validateFileSize,
+  MAX_FILE_SIZE,
+} from "../utils/thumbnails";
 import { and, eq } from "drizzle-orm";
 import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
@@ -91,17 +97,47 @@ servicesRoutes.post("/:id/upload-image", async (c) => {
       return c.json({ error: "Arquivo invalido" }, 400);
     }
 
+    // Validação de tipo MIME
+    if (!validateMimeType(file.type)) {
+      return c.json(
+        {
+          error: "Tipo de arquivo não permitido. Use JPEG, PNG ou WebP.",
+        },
+        400
+      );
+    }
+
     const buffer = await file.arrayBuffer();
+
+    // Validação de tamanho
+    if (!validateFileSize(buffer.byteLength)) {
+      return c.json(
+        {
+          error: `Arquivo muito grande. Tamanho máximo: ${
+            MAX_FILE_SIZE / 1024 / 1024
+          }MB`,
+        },
+        413
+      );
+    }
+
     const ext = file.name.split(".").pop() || "jpg";
     const filename = `${randomUUID()}.${ext}`;
-    const dir = await ensureUploadDir(tenantId);
-    const filePath = join(dir, filename);
-    await Bun.write(filePath, Buffer.from(buffer));
 
-    const imageUrl = `/uploads/${tenantId}/${filename}`;
+    // Gerar thumbnails em múltiplas resoluções
+    const thumbnailUrls = await generateThumbnails(
+      Buffer.from(buffer),
+      tenantId,
+      filename
+    );
+
     const [updated] = await db
       .update(services)
-      .set({ imageUrl })
+      .set({
+        imageUrl: thumbnailUrls.original,
+        imageUrlMedium: thumbnailUrls.medium,
+        imageUrlSmall: thumbnailUrls.small,
+      })
       .where(and(eq(services.id, id), eq(services.companyId, tenantId)))
       .returning();
 

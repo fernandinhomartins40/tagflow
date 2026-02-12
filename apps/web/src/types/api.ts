@@ -25,6 +25,8 @@ export interface Product {
   stock?: number | null;
   active?: boolean | null;
   imageUrl?: string | null;
+  imageUrlMedium?: string | null;
+  imageUrlSmall?: string | null;
   createdAt?: string;
 }
 
@@ -36,6 +38,8 @@ export interface Service {
   unit: string;
   active?: boolean | null;
   imageUrl?: string | null;
+  imageUrlMedium?: string | null;
+  imageUrlSmall?: string | null;
   createdAt?: string;
 }
 
@@ -50,6 +54,8 @@ export interface Location {
   branchId?: string | null;
   active?: boolean | null;
   imageUrl?: string | null;
+  imageUrlMedium?: string | null;
+  imageUrlSmall?: string | null;
   createdAt?: string;
 }
 
