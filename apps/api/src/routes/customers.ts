@@ -7,6 +7,7 @@ import { getTenantId } from "../utils/tenant";
 import { paginationSchema } from "../utils/pagination";
 import { validateCustomerLimit } from "../utils/planValidation";
 import { hashCustomerPassword, initialCustomerPassword, normalizeCpf, normalizePhone } from "../utils/customer";
+import { logger } from "../utils/logger";
 
 const customerSchema = z.object({
   branchId: z.string().uuid().optional(),
@@ -81,36 +82,59 @@ customersRoutes.get("/", async (c) => {
 });
 
 customersRoutes.post("/", async (c) => {
-  const tenantId = getTenantId(c);
+  try {
+    const tenantId = getTenantId(c);
+    logger.request("POST", "/api/customers", { tenantId });
 
-  // Check plan limits before creating
-  const limitCheck = await validateCustomerLimit(c, tenantId);
-  if (limitCheck) return limitCheck;
+    // Check plan limits before creating
+    logger.debug("Checking plan limits", "CUSTOMERS", { tenantId });
+    const limitCheck = await validateCustomerLimit(c, tenantId);
+    if (limitCheck) {
+      logger.warn("Plan limit exceeded", "CUSTOMERS", { tenantId });
+      return limitCheck;
+    }
 
-  const body = customerSchema.parse(await c.req.json());
-  const normalizedCpf = normalizeCpf(body.cpf);
-  const normalizedPhone = normalizePhone(body.phone);
-  if (!normalizedCpf || !normalizedPhone) {
-    return c.json({ error: "CPF e telefone sao obrigatorios" }, 400);
-  }
+    // Parse and validate request body
+    logger.debug("Parsing request body", "CUSTOMERS");
+    const rawBody = await c.req.json();
+    logger.debug("Raw body received", "CUSTOMERS", rawBody);
 
-  const [existingLocal] = await db
-    .select()
-    .from(customers)
-    .where(and(eq(customers.companyId, tenantId), eq(customers.cpf, normalizedCpf)));
-  if (existingLocal) {
-    return c.json({ error: "Cliente ja cadastrado nesta empresa" }, 409);
-  }
+    const body = customerSchema.parse(rawBody);
+    logger.debug("Body validated successfully", "CUSTOMERS", body);
 
-  const globalCustomerId = await ensureGlobalCustomer({
-    cpf: normalizedCpf,
-    phone: normalizedPhone,
-    name: body.name
-  });
+    // Normalize CPF and phone
+    const normalizedCpf = normalizeCpf(body.cpf);
+    const normalizedPhone = normalizePhone(body.phone);
+    logger.debug("Normalized data", "CUSTOMERS", { normalizedCpf, normalizedPhone });
 
-  const [created] = await db
-    .insert(customers)
-    .values({
+    if (!normalizedCpf || !normalizedPhone) {
+      logger.validation("cpf/phone", "Missing required fields");
+      return c.json({ error: "CPF e telefone sao obrigatorios" }, 400);
+    }
+
+    // Check for existing customer
+    logger.db("SELECT", "customers", { tenantId, cpf: normalizedCpf });
+    const [existingLocal] = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.companyId, tenantId), eq(customers.cpf, normalizedCpf)));
+
+    if (existingLocal) {
+      logger.warn("Customer already exists", "CUSTOMERS", { cpf: normalizedCpf });
+      return c.json({ error: "Cliente ja cadastrado nesta empresa" }, 409);
+    }
+
+    // Ensure global customer exists
+    logger.debug("Ensuring global customer", "CUSTOMERS", { cpf: normalizedCpf, phone: normalizedPhone });
+    const globalCustomerId = await ensureGlobalCustomer({
+      cpf: normalizedCpf,
+      phone: normalizedPhone,
+      name: body.name
+    });
+    logger.debug("Global customer ID obtained", "CUSTOMERS", { globalCustomerId });
+
+    // Prepare data for insertion
+    const insertData = {
       name: body.name,
       companyId: tenantId,
       cpf: normalizedCpf,
@@ -119,10 +143,29 @@ customersRoutes.post("/", async (c) => {
       birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
       creditLimit: body.creditLimit ?? undefined,
       globalCustomerId
-    })
-    .returning();
+    };
+    logger.db("INSERT", "customers", insertData);
 
-  return c.json(created, 201);
+    // Insert customer
+    const [created] = await db
+      .insert(customers)
+      .values(insertData)
+      .returning();
+
+    logger.info("Customer created successfully", "CUSTOMERS", { id: created.id, name: created.name });
+    logger.response("POST", "/api/customers", 201, { id: created.id });
+
+    return c.json(created, 201);
+  } catch (error) {
+    logger.error("Failed to create customer", "CUSTOMERS", error);
+
+    if (error instanceof z.ZodError) {
+      logger.validation("request body", error.message, error.errors);
+      return c.json({ error: "Dados invalidos", details: error.errors }, 400);
+    }
+
+    return c.json({ error: "Erro ao criar cliente" }, 500);
+  }
 });
 
 customersRoutes.put("/:id", async (c) => {

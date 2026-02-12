@@ -1,45 +1,19 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil } from "lucide-react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import { Button } from "../../components/ui/button";
-import { apiFetch } from "../../services/api";
-import { getApiBaseUrl } from "../../services/config";
-import { useTenantStore } from "../../store/tenant";
-
-interface Service {
-  id: string;
-  name: string;
-  description?: string | null;
-  price: string;
-  unit: string;
-  imageUrl?: string | null;
-}
+import { apiFetch, apiUpload } from "../../services/api";
+import type { Service, PaginatedResponse } from "../../types/api";
+import { formatCurrencyInput, formatCurrencyValue, parseCurrencyInput } from "../../utils/format";
+import { normalizeOptionalField, parseNumericField } from "../../utils/validation";
 
 const OUTPUT_SIZE = 512;
 
-const formatCurrency = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  if (!digits) return "";
-  const number = Number(digits) / 100;
-  return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-};
-
-const formatCurrencyNumber = (value: number) =>
-  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-const parseCurrency = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  if (!digits) return 0;
-  return Number(digits) / 100;
-};
-
 export function AdminServices() {
   const queryClient = useQueryClient();
-  const tenantId = useTenantStore((state) => state.tenantId);
-  const apiBaseUrl = getApiBaseUrl();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -64,7 +38,7 @@ export function AdminServices() {
 
   const servicesQuery = useQuery({
     queryKey: ["services"],
-    queryFn: () => apiFetch<{ data: Service[] }>("/api/services")
+    queryFn: () => apiFetch<PaginatedResponse<Service>>("/api/services")
   });
 
   useEffect(() => {
@@ -83,31 +57,27 @@ export function AdminServices() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const numericPrice = parseCurrency(price);
-      if (!name.trim()) throw new Error("Informe o nome do servico");
+      const numericPrice = parseCurrencyInput(price);
+      if (!name.trim()) throw new Error("Informe o nome do serviço");
       if (!unit.trim()) throw new Error("Informe a unidade");
-      if (numericPrice <= 0) throw new Error("Informe um preco valido");
+      if (numericPrice <= 0) throw new Error("Informe um preço válido");
 
       const created = await apiFetch<Service>("/api/services", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
-          description: description.trim() || null,
+          description: normalizeOptionalField(description) || null,
           price: numericPrice,
           unit: unit.trim()
         })
       });
+
       if (imageFile) {
-        const form = new FormData();
-        form.append("file", imageFile);
-        await fetch(`${apiBaseUrl}/api/services/${created.id}/upload-image`, {
-          method: "POST",
-          headers: {
-            "X-Tenant-Id": tenantId
-          },
-          body: form,
-          credentials: "include"
-        });
+        try {
+          await apiUpload<Service>(`/api/services/${created.id}/upload-image`, imageFile);
+        } catch (error) {
+          console.error("Erro ao fazer upload da imagem:", error);
+        }
       }
       return created;
     },
@@ -117,46 +87,40 @@ export function AdminServices() {
       setPrice("");
       setUnit("");
       setImageFile(null);
+      setImagePreview(null);
       setFormError(null);
       queryClient.invalidateQueries({ queryKey: ["services"] });
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Erro ao salvar servico.";
+      const message = error instanceof Error ? error.message : "Erro ao salvar serviço.";
       setFormError(message);
     }
   });
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      if (!editService) throw new Error("Servico invalido");
-      const numericPrice = parseCurrency(editPrice);
-      if (!editName.trim()) throw new Error("Informe o nome do servico");
+      if (!editService) throw new Error("Serviço inválido");
+      const numericPrice = parseCurrencyInput(editPrice);
+      if (!editName.trim()) throw new Error("Informe o nome do serviço");
       if (!editUnit.trim()) throw new Error("Informe a unidade");
-      if (numericPrice <= 0) throw new Error("Informe um preco valido");
+      if (numericPrice <= 0) throw new Error("Informe um preço válido");
 
-      const updated = await apiFetch<Service>(`/api/services/${editService.id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            name: editName.trim(),
-            description: editDescription.trim() || null,
-            price: numericPrice,
-            unit: editUnit.trim()
-          })
-        }
-      );
+      const updated = await apiFetch<Service>(`/api/services/${editService.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: normalizeOptionalField(editDescription) || null,
+          price: numericPrice,
+          unit: editUnit.trim()
+        })
+      });
 
       if (editImageFile) {
-        const form = new FormData();
-        form.append("file", editImageFile);
-        await fetch(`${apiBaseUrl}/api/services/${editService.id}/upload-image`, {
-          method: "POST",
-          headers: {
-            "X-Tenant-Id": tenantId
-          },
-          body: form,
-          credentials: "include"
-        });
+        try {
+          await apiUpload<Service>(`/api/services/${editService.id}/upload-image`, editImageFile);
+        } catch (error) {
+          console.error("Erro ao fazer upload da imagem:", error);
+        }
       }
 
       return updated;
@@ -173,7 +137,7 @@ export function AdminServices() {
       queryClient.invalidateQueries({ queryKey: ["services"] });
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Erro ao atualizar servico.";
+      const message = error instanceof Error ? error.message : "Erro ao atualizar serviço.";
       setFormError(message);
     }
   });
@@ -219,8 +183,8 @@ export function AdminServices() {
           />
           <input
             value={price}
-            onChange={(event) => setPrice(formatCurrency(event.target.value))}
-            placeholder="Preco"
+            onChange={(event) => setPrice(formatCurrencyInput(event.target.value))}
+            placeholder="Preço *"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <input
@@ -263,7 +227,7 @@ export function AdminServices() {
               <div className="space-y-1">
                 <p className="text-sm font-semibold leading-tight">{service.name}</p>
                 <p className="text-xs text-slate-500">
-                  {formatCurrencyNumber(Number(service.price))} / {service.unit}
+                  {formatCurrencyValue(parseNumericField(service.price))} / {service.unit}
                 </p>
               </div>
             </div>
@@ -285,7 +249,7 @@ export function AdminServices() {
                   setEditService(service);
                   setEditName(service.name);
                   setEditDescription(service.description ?? "");
-                  setEditPrice(formatCurrencyNumber(Number(service.price)));
+                  setEditPrice(formatCurrencyValue(parseNumericField(service.price)));
                   setEditUnit(service.unit);
                   setEditImageFile(null);
                   setEditImagePreview(service.imageUrl ?? null);
@@ -308,7 +272,7 @@ export function AdminServices() {
             <div>
               <p className="text-lg font-semibold">{viewService.name}</p>
               <p className="text-sm text-slate-600">
-                {formatCurrencyNumber(Number(viewService.price))} / {viewService.unit}
+                {formatCurrencyValue(parseNumericField(viewService.price))} / {viewService.unit}
               </p>
             </div>
             {viewService.description ? (
@@ -323,7 +287,7 @@ export function AdminServices() {
                   setEditService(service);
                   setEditName(service.name);
                   setEditDescription(service.description ?? "");
-                  setEditPrice(formatCurrencyNumber(Number(service.price)));
+                  setEditPrice(formatCurrencyValue(parseNumericField(service.price)));
                   setEditUnit(service.unit);
                   setEditImageFile(null);
                   setEditImagePreview(service.imageUrl ?? null);

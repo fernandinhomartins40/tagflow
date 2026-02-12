@@ -25,6 +25,7 @@ import { superAdminRoutes } from "./routes/superadmin";
 import { stripeRoutes } from "./routes/stripe";
 import { billingRoutes } from "./routes/billing";
 import { customerRoutes } from "./routes/customer";
+import { planLimitsRoutes } from "./routes/plan-limits";
 
 const app = new Hono();
 
@@ -103,6 +104,7 @@ secure.route("/users", usersRoutes);
 secure.route("/tabs", tabsRoutes);
 secure.route("/cash", cashRoutes);
 secure.route("/billing", billingRoutes);
+secure.route("/plan", planLimitsRoutes);
 
 app.route("/api", secure);
 app.route("/", secure);

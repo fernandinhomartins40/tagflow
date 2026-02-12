@@ -4,20 +4,29 @@ import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { Nfc, Barcode, QrCode, Hash } from "lucide-react";
 import { apiFetch } from "../../services/api";
-import { formatCurrencyInput, formatCurrencyValue, parseCurrencyInput } from "../../utils/currency";
 import { ScannerModal } from "../../components/ScannerModal";
 import { AddCreditModal, type PaymentMethod } from "../../components/AddCreditModal";
 import { useNfcReader } from "../../hooks/useNfcReader";
-
-interface Customer {
-  id: string;
-  name: string;
-  credits: string;
-  cpf?: string | null;
-  birthDate?: string | null;
-  phone?: string | null;
-  creditLimit?: string | null;
-}
+import { PlanLimitsDisplay } from "../../components/PlanLimitsDisplay";
+import type { Customer, Branch, PaginatedResponse } from "../../types/api";
+import {
+  maskCpf,
+  maskPhone,
+  maskDate,
+  toIsoDate,
+  formatDate,
+  formatCurrencyInput,
+  formatCurrencyValue,
+  parseCurrencyInput,
+  onlyDigits
+} from "../../utils/format";
+import {
+  validateCpf,
+  validatePhone,
+  validateEmail,
+  normalizeOptionalField,
+  parseNumericField
+} from "../../utils/validation";
 
 export function AdminCustomers() {
   const queryClient = useQueryClient();
@@ -27,29 +36,38 @@ export function AdminCustomers() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
+  const [branchId, setBranchId] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
-    queryFn: () => apiFetch<{ data: Customer[] }>("/api/customers")
+    queryFn: () => apiFetch<PaginatedResponse<Customer>>("/api/customers")
+  });
+
+  const branchesQuery = useQuery({
+    queryKey: ["branches"],
+    queryFn: () => apiFetch<PaginatedResponse<Branch>>("/api/branches")
   });
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const payload: any = {
-        name,
+        name: name.trim(),
         cpf: onlyDigits(cpf),
         phone: onlyDigits(phone)
       };
 
-      // Só adicionar campos opcionais se tiverem valor
-      if (email.trim()) payload.email = email.trim();
+      // Adicionar campos opcionais apenas se tiverem valor
+      const normalizedEmail = normalizeOptionalField(email);
+      if (normalizedEmail) payload.email = normalizedEmail;
 
       const isoDate = toIsoDate(birthDate);
       if (isoDate) payload.birthDate = isoDate;
 
       const limit = parseCurrencyInput(creditLimit);
       if (limit && limit > 0) payload.creditLimit = limit;
+
+      if (branchId) payload.branchId = branchId;
 
       return apiFetch<Customer>("/api/customers", {
         method: "POST",
@@ -63,6 +81,7 @@ export function AdminCustomers() {
       setPhone("");
       setEmail("");
       setCreditLimit("");
+      setBranchId("");
       setFormError(null);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
@@ -91,6 +110,35 @@ export function AdminCustomers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] })
   });
 
+  const handleSubmit = () => {
+    const cpfDigits = onlyDigits(cpf);
+    const phoneDigits = onlyDigits(phone);
+
+    // Validações
+    if (!name.trim()) {
+      setFormError("Informe o nome do cliente.");
+      return;
+    }
+
+    if (!validateCpf(cpf)) {
+      setFormError("CPF inválido. Verifique os dígitos verificadores.");
+      return;
+    }
+
+    if (!validatePhone(phone)) {
+      setFormError("Informe um telefone válido com pelo menos 10 dígitos.");
+      return;
+    }
+
+    if (email.trim() && !validateEmail(email)) {
+      setFormError("Email inválido.");
+      return;
+    }
+
+    setFormError(null);
+    createMutation.mutate();
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -98,7 +146,10 @@ export function AdminCustomers() {
           <h2 className="text-2xl font-semibold">Clientes</h2>
           <p className="text-sm text-slate-600">Cadastro, identificadores e saldo.</p>
         </div>
+        <PlanLimitsDisplay resource="customers" compact />
       </header>
+
+      <PlanLimitsDisplay resource="customers" />
 
       <div className="rounded-2xl border border-brand-100 bg-white p-4">
         <h3 className="text-lg font-semibold">Novo cliente</h3>
@@ -106,13 +157,13 @@ export function AdminCustomers() {
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Nome"
+            placeholder="Nome *"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <input
             value={cpf}
             onChange={(event) => setCpf(maskCpf(event.target.value))}
-            placeholder="CPF"
+            placeholder="CPF *"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <input
@@ -124,7 +175,7 @@ export function AdminCustomers() {
           <input
             value={phone}
             onChange={(event) => setPhone(maskPhone(event.target.value))}
-            placeholder="Telefone/WhatsApp"
+            placeholder="Telefone/WhatsApp *"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
           <input
@@ -137,31 +188,28 @@ export function AdminCustomers() {
           <input
             value={creditLimit}
             onChange={(event) => setCreditLimit(formatCurrencyInput(event.target.value))}
-            placeholder="Limite de credito (pos-pago)"
+            placeholder="Limite de crédito (pós-pago)"
             className="w-full rounded-xl border border-brand-100 px-3 py-2"
           />
+          {branchesQuery.data?.data && branchesQuery.data.data.length > 0 && (
+            <select
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+              className="w-full rounded-xl border border-brand-100 px-3 py-2"
+            >
+              <option value="">Todas as filiais</option>
+              {branchesQuery.data.data.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         {formError ? <p className="mt-3 text-sm text-rose-500">{formError}</p> : null}
         <Button
           className="mt-3"
-          onClick={() => {
-            const cpfDigits = onlyDigits(cpf);
-            const phoneDigits = onlyDigits(phone);
-            if (!name.trim()) {
-              setFormError("Informe o nome do cliente.");
-              return;
-            }
-            if (cpfDigits.length !== 11) {
-              setFormError("Informe um CPF valido.");
-              return;
-            }
-            if (phoneDigits.length < 10) {
-              setFormError("Informe um telefone valido.");
-              return;
-            }
-            setFormError(null);
-            createMutation.mutate();
-          }}
+          onClick={handleSubmit}
           disabled={createMutation.isPending}
         >
           {createMutation.isPending ? "Salvando..." : "Adicionar cliente"}
@@ -173,10 +221,14 @@ export function AdminCustomers() {
           <div key={customer.id} className="rounded-2xl border border-brand-100 bg-white p-4">
             <h3 className="text-lg font-semibold text-slate-900">{customer.name}</h3>
             <p className="text-sm text-slate-600">CPF: {customer.cpf ? maskCpf(customer.cpf) : "-"}</p>
-            <p className="text-sm text-slate-600">Nascimento: {customer.birthDate ? formatDate(customer.birthDate) : "-"}</p>
+            <p className="text-sm text-slate-600">Nascimento: {formatDate(customer.birthDate)}</p>
             <p className="text-sm text-slate-600">Telefone: {customer.phone ? maskPhone(customer.phone) : "-"}</p>
-            <p className="text-sm text-slate-600">Saldo pre-pago: R$ {customer.credits ?? 0}</p>
-            <p className="text-sm text-slate-600">Limite de credito (pos-pago): R$ {customer.creditLimit ?? 0}</p>
+            <p className="text-sm text-slate-600">
+              Saldo pré-pago: {formatCurrencyValue(parseNumericField(customer.credits))}
+            </p>
+            <p className="text-sm text-slate-600">
+              Limite de crédito (pós-pago): {formatCurrencyValue(parseNumericField(customer.creditLimit))}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <CreditAdder
                 customerId={customer.id}
@@ -328,49 +380,6 @@ function NfcDialog({ onClose, onRead }: { onClose: () => void; onRead: (value: s
     </div>,
     document.body
   );
-}
-
-function onlyDigits(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function maskCpf(value: string) {
-  const digits = onlyDigits(value).slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-}
-
-function maskPhone(value: string) {
-  const digits = onlyDigits(value).slice(0, 11);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
-function maskDate(value: string) {
-  const digits = onlyDigits(value).slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-}
-
-function toIsoDate(value: string) {
-  const digits = onlyDigits(value);
-  if (digits.length !== 8) return null;
-  const day = digits.slice(0, 2);
-  const month = digits.slice(2, 4);
-  const year = digits.slice(4, 8);
-  return `${year}-${month}-${day}`;
-}
-
-function formatDate(value: string) {
-  if (value.includes("/")) return value;
-  const [year, month, day] = value.split("-");
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
 }
 
 function CreditAdder({ customerId, onAdd }: { customerId: string; onAdd: (amount: number, method: PaymentMethod) => void }) {
