@@ -167,7 +167,8 @@ customersRoutes.post("/", async (c) => {
       insertData.email = body.email;
     }
     if (body.birthDate) {
-      insertData.birthDate = new Date(body.birthDate);
+      // Drizzle date() aceita string no formato YYYY-MM-DD diretamente
+      insertData.birthDate = body.birthDate;
     }
     if (body.creditLimit !== undefined && body.creditLimit !== null) {
       insertData.creditLimit = body.creditLimit;
