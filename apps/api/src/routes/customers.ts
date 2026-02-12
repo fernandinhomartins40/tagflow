@@ -182,10 +182,47 @@ customersRoutes.post("/", async (c) => {
 
     if (error instanceof z.ZodError) {
       logger.validation("request body", error.message, error.errors);
-      return c.json({ error: "Dados invalidos", details: error.errors }, 400);
+      return c.json({
+        error: "Dados inválidos",
+        message: "Verifique os campos obrigatórios: nome, CPF e telefone.",
+        details: error.errors
+      }, 400);
     }
 
-    return c.json({ error: "Erro ao criar cliente" }, 500);
+    // Erro específico de empresa/plano não encontrado
+    if (error instanceof Error) {
+      if (error.message.includes("Empresa não encontrada")) {
+        return c.json({
+          error: "Empresa não encontrada",
+          message: error.message
+        }, 404);
+      }
+
+      if (error.message.includes("duplicate") || error.message.includes("unique")) {
+        return c.json({
+          error: "Cliente já existe",
+          message: "Já existe um cliente com este CPF cadastrado."
+        }, 409);
+      }
+
+      // Log do erro completo para debug
+      logger.error("Unexpected error details", "CUSTOMERS", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+
+      return c.json({
+        error: "Erro ao criar cliente",
+        message: "Ocorreu um erro inesperado. Tente novamente ou contate o suporte.",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined
+      }, 500);
+    }
+
+    return c.json({
+      error: "Erro desconhecido",
+      message: "Erro inesperado ao processar requisição."
+    }, 500);
   }
 });
 

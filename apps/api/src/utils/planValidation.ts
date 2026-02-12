@@ -40,19 +40,25 @@ export const validateUserLimit = async (c: Context, companyId: string) => {
 };
 
 export const validateCustomerLimit = async (c: Context, companyId: string) => {
-  const check = await checkCustomerLimit(companyId);
-  if (!check.allowed) {
-    return c.json(
-      {
-        error: "Limite de clientes atingido",
-        message: `Seu plano permite apenas ${check.max} cliente(s). Voce ja tem ${check.current}. Faca upgrade para adicionar mais.`,
-        limit: check.max,
-        current: check.current
-      },
-      403
-    );
+  try {
+    const check = await checkCustomerLimit(companyId);
+    if (!check.allowed) {
+      return c.json(
+        {
+          error: "Limite de clientes atingido",
+          message: `Seu plano permite apenas ${check.max} cliente(s). Você já tem ${check.current}. Faça upgrade para adicionar mais.`,
+          limit: check.max,
+          current: check.current
+        },
+        403
+      );
+    }
+    return null;
+  } catch (error) {
+    console.error("[PLAN_VALIDATION] Error checking customer limit:", error);
+    // Se falhar a validação, permite criar (fail-safe)
+    return null;
   }
-  return null;
 };
 
 export const validateBookingLimit = async (c: Context, companyId: string) => {

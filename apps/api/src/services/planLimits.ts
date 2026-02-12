@@ -87,10 +87,20 @@ export const getPlanLimits = (planName: string, limits?: string | null): PlanLim
 export const getCompanyPlanLimits = async (companyId: string): Promise<PlanLimits> => {
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   if (!company) {
-    throw new Error("Company not found");
+    throw new Error(`Empresa não encontrada (ID: ${companyId}). Verifique se o tenant está correto.`);
   }
-  const [plan] = await db.select().from(plans).where(eq(plans.name, company.plan));
-  return getPlanLimits(company.plan, plan?.limits);
+
+  // Se não tiver plano definido, usa "Free" como padrão
+  const planName = company.plan || "Free";
+
+  // Validar se o planName não é undefined/null antes de fazer a query
+  if (!planName || typeof planName !== 'string') {
+    console.error(`[PLAN_LIMITS] Invalid plan name for company ${companyId}:`, planName);
+    return DEFAULT_LIMITS.Free;
+  }
+
+  const [plan] = await db.select().from(plans).where(eq(plans.name, planName));
+  return getPlanLimits(planName, plan?.limits);
 };
 
 export const checkBranchLimit = async (companyId: string): Promise<{ allowed: boolean; current: number; max: number }> => {
