@@ -128,6 +128,8 @@ export function AdminPdv() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scanType, setScanType] = useState<"qr" | "barcode">("qr");
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [locationStart, setLocationStart] = useState("");
   const [locationEnd, setLocationEnd] = useState("");
@@ -335,87 +337,117 @@ export function AdminPdv() {
 
   const handleConfirmIdentify = async () => {
     setError(null);
-    const resolved = resolveIdentifier();
-    if (!resolved) {
-      setError("Informe um identificador valido.");
-      return;
-    }
+    setSuccessMessage(null);
+    setIsProcessing(true);
 
-    let customerId: string | null = null;
-    if (identifyMethod === "search") {
-      if (!searchCustomerId) {
-        setError("Selecione um cliente.");
+    try {
+      const resolved = resolveIdentifier();
+      if (!resolved) {
+        setError("Informe um identificador valido.");
         return;
       }
-      customerId = searchCustomerId;
-      try {
-        await apiFetch(`/api/customers/${searchCustomerId}/activate-tag`, {
-          method: "POST",
-          body: JSON.stringify({ type: "manual", code: resolved, tabType })
-        });
-      } catch {
-        // ignore conflict
-      }
-    }
 
-    const tab = await openTabMutation.mutateAsync({ identifier: resolved, type: tabType });
-
-    const itemsSnapshot = [...cartItems];
-    for (const item of itemsSnapshot) {
-      if (item.type === "credit") {
-        const customer = await apiFetch<{ data: Customer | null }>(`/api/customers/by-identifier/${resolved}`);
-        if (!customer.data) {
-          throw new Error("Cliente nao encontrado para inserir credito");
+      let customerId: string | null = null;
+      if (identifyMethod === "search") {
+        if (!searchCustomerId) {
+          setError("Selecione um cliente.");
+          return;
         }
-        await addCreditsMutation.mutateAsync({
-          customerId: customer.data.id,
-          amount: item.price,
-          paymentMethod: item.paymentMethod ?? "cash"
-        });
-        continue;
+        customerId = searchCustomerId;
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${searchCustomerId}/activate-tag`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ type: "manual", code: resolved, tabType })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            if (response.status === 409) {
+              setError(errorData.message || "Este código já está vinculado a outro cliente ativo.");
+              return;
+            }
+          } else {
+            setSuccessMessage("✓ Identificador vinculado com sucesso!");
+          }
+        } catch (err) {
+          console.error("Erro ao vincular identificador:", err);
+          // Continue mesmo se falhar (pode já estar vinculado)
+        }
       }
 
-      if (item.type === "location") {
-        if (!item.startAt || !item.endAt) {
-          throw new Error("Informe horario da locacao");
+      const tab = await openTabMutation.mutateAsync({ identifier: resolved, type: tabType });
+
+      const itemsSnapshot = [...cartItems];
+      for (const item of itemsSnapshot) {
+        if (item.type === "credit") {
+          const customer = await apiFetch<{ data: Customer | null }>(`/api/customers/by-identifier/${resolved}`);
+          if (!customer.data) {
+            throw new Error("Cliente nao encontrado para inserir credito");
+          }
+          await addCreditsMutation.mutateAsync({
+            customerId: customer.data.id,
+            amount: item.price,
+            paymentMethod: item.paymentMethod ?? "cash"
+          });
+          continue;
         }
-        const participants = item.participants ?? [];
-        await createBookingMutation.mutateAsync({
-          locationId: item.id ?? "",
+
+        if (item.type === "location") {
+          if (!item.startAt || !item.endAt) {
+            throw new Error("Informe horario da locacao");
+          }
+          const participants = item.participants ?? [];
+          await createBookingMutation.mutateAsync({
+            locationId: item.id ?? "",
+            startAt: item.startAt,
+            endAt: item.endAt,
+            total: item.price,
+            participants: participants.map((p) => ({ customerId: p.customerId, share: p.amount }))
+          });
+        }
+
+        const created = await addTabItemMutation.mutateAsync({
+          tabId: tab.id,
+          productId: item.type === "product" ? item.id : undefined,
+          serviceId: item.type === "service" ? item.id : undefined,
+          locationId: item.type === "location" ? item.id : undefined,
+          description: item.type === "location" ? "Locacao" : undefined,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          total: item.price * item.quantity,
           startAt: item.startAt,
-          endAt: item.endAt,
-          total: item.price,
-          participants: participants.map((p) => ({ customerId: p.customerId, share: p.amount }))
+          endAt: item.endAt
         });
+
+        if (item.type === "location" && item.participants?.length) {
+          await addTabItemParticipants.mutateAsync({
+            tabItemId: (created as { id: string }).id,
+            participants: item.participants
+          });
+        }
       }
 
-      const created = await addTabItemMutation.mutateAsync({
-        tabId: tab.id,
-        productId: item.type === "product" ? item.id : undefined,
-        serviceId: item.type === "service" ? item.id : undefined,
-        locationId: item.type === "location" ? item.id : undefined,
-        description: item.type === "location" ? "Locacao" : undefined,
-        quantity: item.quantity,
-        unitPrice: item.price,
-        total: item.price * item.quantity,
-        startAt: item.startAt,
-        endAt: item.endAt
-      });
+      setSuccessMessage(`✓ Comanda processada com sucesso! ${itemsSnapshot.length} item(ns) adicionado(s).`);
 
-      if (item.type === "location" && item.participants?.length) {
-        await addTabItemParticipants.mutateAsync({
-          tabItemId: (created as { id: string }).id,
-          participants: item.participants
-        });
-      }
+      // Aguardar 1.5s para mostrar mensagem antes de fechar
+      setTimeout(() => {
+        setCartItems([]);
+        setIdentifyOpen(false);
+        setIdentifier("");
+        setNumberInput("");
+        setSearchIdentifier("");
+        setSearchCustomerId(null);
+        setSuccessMessage(null);
+      }, 1500);
+
+    } catch (err: any) {
+      console.error("Erro ao processar comanda:", err);
+      setError(err.message || "Erro ao processar comanda. Tente novamente.");
+    } finally {
+      setIsProcessing(false);
     }
-
-    setCartItems([]);
-    setIdentifyOpen(false);
-    setIdentifier("");
-    setNumberInput("");
-    setSearchIdentifier("");
-    setSearchCustomerId(null);
   };
 
   const calcLocationTotal = (location: Location | undefined) => {
@@ -856,18 +888,32 @@ export function AdminPdv() {
               </div>
             ) : null}
 
+            {successMessage ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200">
+                {successMessage}
+              </div>
+            ) : null}
+
+            {error ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200">
+                {error}
+              </div>
+            ) : null}
+
             <div className="grid gap-2 sm:grid-cols-2">
               <select
                 value={tabType}
                 onChange={(event) => setTabType(event.target.value as "credit" | "prepaid")}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                disabled={isProcessing}
               >
                 <option value="prepaid">Comanda pre-paga (saldo antecipado)</option>
                 <option value="credit">Comanda credito (acerto no final)</option>
               </select>
-              <Button onClick={handleConfirmIdentify}>Confirmar</Button>
+              <Button onClick={handleConfirmIdentify} disabled={isProcessing}>
+                {isProcessing ? "Processando..." : "Confirmar"}
+              </Button>
             </div>
-            {error ? <p className="text-sm text-rose-500">{error}</p> : null}
           </div>
         </Modal>
       ) : null}
