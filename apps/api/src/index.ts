@@ -95,6 +95,15 @@ app.get("/health/storage", async (c) => {
   }
 });
 
+app.get("/uploads/:tenant/:subfolder/:file", (c) => {
+  const tenant = c.req.param("tenant");
+  const subfolder = c.req.param("subfolder");
+  const file = c.req.param("file");
+  const filePath = join("/app/uploads", tenant, subfolder, file);
+  return c.body(Bun.file(filePath));
+});
+
+// Rota de fallback para imagens antigas (sem subfolder)
 app.get("/uploads/:tenant/:file", (c) => {
   const tenant = c.req.param("tenant");
   const file = c.req.param("file");

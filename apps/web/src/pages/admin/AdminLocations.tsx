@@ -1,7 +1,7 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, Pencil } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import { Button } from "../../components/ui/button";
@@ -218,6 +218,17 @@ export function AdminLocations() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiFetch(`/api/locations/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
+    },
+  });
+
   const handleSelectImage = async (file: File | null, target: "create" | "edit") => {
     if (!file) return;
     const reader = new FileReader();
@@ -385,6 +396,18 @@ export function AdminLocations() {
                 }}
               >
                 <Pencil className="h-4 w-4" style={{ color: "#d97706" }} />
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100"
+                onClick={() => {
+                  if (confirm(`Tem certeza que deseja excluir "${location.name}"?`)) {
+                    deleteMutation.mutate(location.id);
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4" style={{ color: "#e11d48" }} />
               </button>
             </div>
           </div>

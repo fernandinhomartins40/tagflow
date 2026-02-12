@@ -71,14 +71,64 @@ customersRoutes.get("/", async (c) => {
   const { page, pageSize } = paginationSchema.parse(c.req.query());
   const offset = (page - 1) * pageSize;
 
+  // Filtros opcionais
+  const search = c.req.query("search");
+  const branchId = c.req.query("branchId");
+  const hasBalance = c.req.query("hasBalance");
+  const hasLimit = c.req.query("hasLimit");
+
+  // Construir condições dinamicamente
+  const conditions = [eq(customers.companyId, tenantId)];
+
+  // Filtro de filial
+  if (branchId) {
+    conditions.push(eq(customers.branchId, branchId));
+  }
+
+  // Filtro de saldo
+  if (hasBalance === "true") {
+    conditions.push(sql`${customers.credits} > 0`);
+  } else if (hasBalance === "false") {
+    conditions.push(sql`${customers.credits} = 0`);
+  }
+
+  // Filtro de limite
+  if (hasLimit === "true") {
+    conditions.push(sql`${customers.creditLimit} > 0`);
+  } else if (hasLimit === "false") {
+    conditions.push(sql`${customers.creditLimit} = 0`);
+  }
+
+  // Busca por nome, CPF ou telefone
+  if (search) {
+    const searchTerm = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(
+        LOWER(${customers.name}) LIKE ${searchTerm} OR
+        ${customers.cpf} LIKE ${searchTerm} OR
+        ${customers.phone} LIKE ${searchTerm}
+      )`
+    );
+  }
+
+  // Contar total de registros
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(and(...conditions));
+
+  const total = Number(countResult?.count || 0);
+
+  // Buscar dados com paginação
   const data = await db
     .select()
     .from(customers)
-    .where(eq(customers.companyId, tenantId))
+    .where(and(...conditions))
+    .orderBy(sql`${customers.name} ASC`)
     .limit(pageSize)
     .offset(offset);
 
-  return c.json({ data, meta: { page, pageSize } });
+  return c.json({ data, meta: { page, pageSize, total } });
 });
 
 customersRoutes.post("/", async (c) => {
