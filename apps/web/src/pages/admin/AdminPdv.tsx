@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, CupSoda, MapPinned, CreditCard, Link2 } from "lucide-react";
+import { Boxes, CupSoda, MapPinned, CreditCard, Link2, Nfc, Barcode, QrCode, Hash } from "lucide-react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -826,15 +826,54 @@ export function AdminPdv() {
       {identifyOpen ? (
         <Modal title="Identificar cliente" onClose={() => setIdentifyOpen(false)}>
           <div className="space-y-3">
-            <p className="text-sm text-slate-600 dark:text-neutral-300">Prioridade: NFC. O leitor foi ativado automaticamente.</p>
-            <p className="text-xs text-slate-500 dark:text-neutral-400">Credito pre-pago = saldo antecipado. Credito = consumo com acerto no final.</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button variant={identifyMethod === "nfc" ? "default" : "outline"} onClick={() => setIdentifyMethod("nfc")}>NFC</Button>
-              <Button variant={identifyMethod === "qr" ? "default" : "outline"} onClick={() => { setIdentifyMethod("qr"); setScanType("qr"); setScanOpen(true); }}>QR Code</Button>
-              <Button variant={identifyMethod === "barcode" ? "default" : "outline"} onClick={() => { setIdentifyMethod("barcode"); setScanType("barcode"); setScanOpen(true); }}>Codigo de barras</Button>
-              <Button variant={identifyMethod === "number" ? "default" : "outline"} onClick={() => setIdentifyMethod("number")}>Numeracao</Button>
-              <Button variant={identifyMethod === "search" ? "default" : "outline"} onClick={() => setIdentifyMethod("search")}>Busca de cliente</Button>
+            <p className="text-sm text-slate-600 dark:text-neutral-300">Selecione a forma de identificação do cliente</p>
+            <p className="text-xs text-slate-500 dark:text-neutral-400">Crédito pré-pago = saldo antecipado. Crédito = consumo com acerto no final.</p>
+
+            {/* Cards de seleção */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { value: "nfc", label: "NFC", icon: Nfc },
+                { value: "barcode", label: "Código", icon: Barcode },
+                { value: "qr", label: "QR Code", icon: QrCode },
+                { value: "number", label: "Numeração", icon: Hash }
+              ].map((option) => {
+                const active = identifyMethod === option.value;
+                const isNfc = option.value === "nfc";
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setIdentifyMethod(option.value as typeof identifyMethod);
+                      if (option.value === "qr") {
+                        setScanType("qr");
+                        setScanOpen(true);
+                      } else if (option.value === "barcode") {
+                        setScanType("barcode");
+                        setScanOpen(true);
+                      }
+                    }}
+                    className={`flex aspect-square flex-col items-center justify-center rounded-2xl border px-2 text-xs font-semibold transition ${
+                      active ? "border-brand-500 bg-brand-50 text-brand-700" : "border-brand-100 bg-white text-slate-600"
+                    } ${isNfc && nfc.status === "scanning" ? "relative animate-pulse border-emerald-300 bg-emerald-50 text-emerald-700" : ""}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="mt-1">{option.label}</span>
+                    {isNfc && nfc.status === "scanning" && <span className="absolute -top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />}
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Botão de busca de cliente */}
+            <Button
+              variant={identifyMethod === "search" ? "default" : "outline"}
+              onClick={() => setIdentifyMethod("search")}
+              className="w-full"
+            >
+              Buscar cliente por nome
+            </Button>
 
             {identifyMethod === "number" ? (
               <input
@@ -1090,10 +1129,17 @@ export function AdminPdv() {
         onClose={() => setScanOpen(false)}
         mode={scanType}
         onScan={(value) => {
-          if (scanType === "qr" || scanType === "barcode") {
-            setIdentifier(value);
-          }
+          console.log("Scanner leu:", value, "Tipo:", scanType);
+          setIdentifier(value);
           setScanOpen(false);
+
+          // Auto-submit quando scanner lê com sucesso
+          if (value && identifyOpen) {
+            console.log("Auto-submetendo scanner:", value);
+            setTimeout(() => {
+              handleConfirmIdentify();
+            }, 500);
+          }
         }}
       />
       <AddCreditModal

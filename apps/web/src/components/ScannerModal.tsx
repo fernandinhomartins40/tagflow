@@ -37,7 +37,7 @@ export function ScannerModal({ open, onClose, onScan, mode }: ScannerModalProps)
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-4 dark:bg-[#120f0d] dark:text-neutral-100">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{mode === "qr" ? "Scanner de QR Code" : "Scanner de codigo de barras"}</h3>
