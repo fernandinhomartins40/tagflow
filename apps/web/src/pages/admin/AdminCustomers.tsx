@@ -191,14 +191,25 @@ export function AdminCustomers() {
   // Mutation para vincular identificador
   const linkIdentifierMutation = useMutation({
     mutationFn: async ({ id, type, code, tabType }: { id: string; type: string; code: string; tabType: string }) => {
-      return apiFetch(`/api/customers/${id}/activate-tag`, {
+      const response = await apiFetch(`/api/customers/${id}/activate-tag`, {
         method: "POST",
         body: JSON.stringify({ type, code, tabType })
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || error.error || "Erro ao vincular identificador");
+      }
+
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customer-identifiers"] });
+      alert(`✅ Identificador vinculado com sucesso!\n\nComanda criada: ${data.tab?.id ? "Sim" : "Não"}\nTipo: ${data.identifier?.tabType === "credit" ? "Crédito" : "Pré-pago"}`);
+    },
+    onError: (error: Error) => {
+      alert(`❌ Erro ao vincular identificador:\n\n${error.message}`);
     }
   });
 
@@ -376,6 +387,7 @@ export function AdminCustomers() {
             <IdentifierLinker
               customerId={customer.id}
               onLink={(type, code, tabType) => linkIdentifierMutation.mutate({ id: customer.id, type, code, tabType })}
+              isLoading={linkIdentifierMutation.isPending}
             />
           </div>
         ))}
@@ -384,13 +396,31 @@ export function AdminCustomers() {
   );
 }
 
-function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: (type: string, code: string, tabType: string) => void }) {
+function IdentifierLinker({
+  customerId,
+  onLink,
+  isLoading
+}: {
+  customerId: string;
+  onLink: (type: string, code: string, tabType: string) => void;
+  isLoading?: boolean;
+}) {
   const [type, setType] = useState<"nfc" | "barcode" | "qr" | "manual">("nfc");
   const [code, setCode] = useState("");
   const [tabType, setTabType] = useState<"prepaid" | "credit">("prepaid");
   const [nfcDialogOpen, setNfcDialogOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerMode, setScannerMode] = useState<"qr" | "barcode">("qr");
+
+  const handleLink = () => {
+    if (!code.trim()) {
+      alert("⚠️ Digite um código para vincular");
+      return;
+    }
+    onLink(type, code, tabType);
+    // Limpar código após vincular
+    setCode("");
+  };
 
   // Query para buscar identificadores vinculados
   const identifiersQuery = useQuery({
@@ -479,9 +509,10 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
         onChange={(e) => setCode(e.target.value)}
         placeholder={`Codigo para ${customerId.slice(0, 6)}...`}
         className="w-full rounded-xl border border-brand-100 px-3 py-2"
+        disabled={isLoading}
       />
-      <Button size="sm" onClick={() => onLink(type, code, tabType)}>
-        Vincular
+      <Button size="sm" onClick={handleLink} disabled={isLoading || !code.trim()}>
+        {isLoading ? "Vinculando..." : "Vincular"}
       </Button>
 
       {/* Lista de identificadores vinculados */}
@@ -518,8 +549,10 @@ function IdentifierLinker({ customerId, onLink }: { customerId: string; onLink: 
         <NfcDialog
           onClose={() => setNfcDialogOpen(false)}
           onRead={(value) => {
-            setCode(value);
-            onLink(type, value, tabType);
+            if (value.trim()) {
+              onLink(type, value, tabType);
+              setCode("");
+            }
             setNfcDialogOpen(false);
           }}
         />
