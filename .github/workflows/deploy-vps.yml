@@ -107,6 +107,8 @@ jobs:
             VAPID_SUBJECT=${VAPID_SUBJECT}
             STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
             STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+            LOG_LEVEL=debug
+            VITE_LOG_LEVEL=warn
             BUILD_DATE=\$(date +%Y%m%d%H%M%S)
             EOF
 
