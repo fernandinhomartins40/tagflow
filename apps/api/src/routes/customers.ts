@@ -98,6 +98,15 @@ customersRoutes.post("/", async (c) => {
     logger.debug("Parsing request body", "CUSTOMERS");
     const rawBody = await c.req.json();
     logger.debug("Raw body received", "CUSTOMERS", rawBody);
+    logger.debug("Raw body field types", "CUSTOMERS", {
+      name: typeof rawBody.name,
+      cpf: typeof rawBody.cpf,
+      phone: typeof rawBody.phone,
+      email: typeof rawBody.email,
+      birthDate: typeof rawBody.birthDate,
+      creditLimit: typeof rawBody.creditLimit,
+      branchId: typeof rawBody.branchId
+    });
 
     const body = customerSchema.parse(rawBody);
     logger.debug("Body validated successfully", "CUSTOMERS", body);

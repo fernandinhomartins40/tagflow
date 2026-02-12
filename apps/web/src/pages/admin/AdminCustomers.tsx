@@ -69,6 +69,17 @@ export function AdminCustomers() {
 
       if (branchId) payload.branchId = branchId;
 
+      console.log("[DEBUG] Payload being sent:", payload);
+      console.log("[DEBUG] Payload types:", {
+        name: typeof payload.name,
+        cpf: typeof payload.cpf,
+        phone: typeof payload.phone,
+        email: typeof payload.email,
+        birthDate: typeof payload.birthDate,
+        creditLimit: typeof payload.creditLimit,
+        branchId: typeof payload.branchId
+      });
+
       return apiFetch<Customer>("/api/customers", {
         method: "POST",
         body: JSON.stringify(payload)
