@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Nfc, Barcode, QrCode, Hash, CreditCard, Wallet, User } from "lucide-react";
 import { apiFetch } from "../../services/api";
@@ -49,7 +50,6 @@ export function AdminTabs() {
   const [identifierType, setIdentifierType] = useState<IdentifierType>("nfc");
   const [identifier, setIdentifier] = useState("");
   const [type, setType] = useState<"credit" | "prepaid">("prepaid");
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [closingTab, setClosingTab] = useState<Tab | null>(null);
   const [closeTotal, setCloseTotal] = useState(0);
   const [closeError, setCloseError] = useState<string | null>(null);
@@ -82,12 +82,6 @@ export function AdminTabs() {
   const locationsQuery = useQuery({
     queryKey: ["locations"],
     queryFn: () => apiFetch<{ data: Array<{ id: string; name: string }> }>("/api/locations")
-  });
-
-  const tabDetailsQuery = useQuery({
-    queryKey: ["tab-details", activeTabId],
-    queryFn: () => apiFetch<{ tab: Tab; items: TabItem[] }>(`/api/tabs/${activeTabId}`),
-    enabled: Boolean(activeTabId)
   });
 
   const cashOpenQuery = useQuery({
@@ -370,13 +364,11 @@ export function AdminTabs() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setActiveTabId(activeTabId === tab.id ? null : tab.id)}
-                  >
-                    {activeTabId === tab.id ? "Ocultar itens" : "Ver itens"}
-                  </Button>
+                  <Link to={`/admin/tabs/${tab.id}`}>
+                    <Button size="sm" variant="outline">
+                      Ver detalhes
+                    </Button>
+                  </Link>
                   {isOpen && (
                     <Button
                       size="sm"
@@ -396,41 +388,6 @@ export function AdminTabs() {
                 </div>
               </div>
 
-              {activeTabId === tab.id && (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                  <h4 className="text-sm font-semibold text-slate-700">Itens da comanda</h4>
-                  {tabDetailsQuery.isLoading ? (
-                    <p className="mt-2 text-sm text-slate-500">Carregando itens...</p>
-                  ) : tabDetailsQuery.data?.items?.length ? (
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="text-xs uppercase text-slate-400">
-                          <tr>
-                            <th className="py-2 text-left">Item</th>
-                            <th className="py-2 text-left">Qtd</th>
-                            <th className="py-2 text-left">Unitario</th>
-                            <th className="py-2 text-left">Total</th>
-                            <th className="py-2 text-left">Data/Hora</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-slate-600">
-                          {tabDetailsQuery.data.items.map((item) => (
-                            <tr key={item.id} className="border-t border-slate-200">
-                              <td className="py-2">{resolveItemLabel(item)}</td>
-                              <td className="py-2">{item.quantity}</td>
-                              <td className="py-2">R$ {Number(item.unitPrice).toFixed(2)}</td>
-                              <td className="py-2">R$ {Number(item.total).toFixed(2)}</td>
-                              <td className="py-2">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-500">Nenhum item registrado.</p>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

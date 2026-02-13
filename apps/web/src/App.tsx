@@ -12,6 +12,7 @@ import { AdminReports } from "./pages/admin/AdminReports";
 import { AdminBranches } from "./pages/admin/AdminBranches";
 import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminTabs } from "./pages/admin/AdminTabs";
+import { AdminTabDetail } from "./pages/admin/AdminTabDetail";
 import { AdminIdentifiers } from "./pages/admin/AdminIdentifiers";
 import { AdminCash } from "./pages/admin/AdminCash";
 import { AdminSubscriptions } from "./pages/admin/AdminSubscriptions";
@@ -127,6 +128,7 @@ export default function App() {
         <Route path="/admin/branches" element={<RequireAuth status={status}><AdminBranches /></RequireAuth>} />
         <Route path="/admin/users" element={<RequireAuth status={status}><AdminUsers /></RequireAuth>} />
         <Route path="/admin/tabs" element={<RequireAuth status={status}><AdminTabs /></RequireAuth>} />
+        <Route path="/admin/tabs/:id" element={<RequireAuth status={status}><AdminTabDetail /></RequireAuth>} />
         <Route path="/admin/identifiers" element={<RequireAuth status={status}><AdminIdentifiers /></RequireAuth>} />
         <Route path="/admin/cash" element={<RequireAuth status={status}><AdminCash /></RequireAuth>} />
         <Route path="/admin/subscriptions" element={<RequireAuth status={status}><AdminSubscriptions /></RequireAuth>} />
