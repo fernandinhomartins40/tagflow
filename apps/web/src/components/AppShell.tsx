@@ -257,7 +257,7 @@ export function AppShell() {
           </aside>
         ) : null}
 
-        <main className="min-h-[70vh] flex-1 rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] sm:p-6 sm:pb-6">
+        <main className="min-h-[70vh] min-w-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pb-28 shadow-sm dark:border-[#2a2420] dark:bg-[#1b1613] sm:p-6 sm:pb-6">
           {isAuthenticated && showPushPrompt ? (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
               {isIos && !isStandalone ? (

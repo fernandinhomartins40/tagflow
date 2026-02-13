@@ -238,9 +238,9 @@ function DesktopRow({
   return (
     <>
       <tr className="border-b border-slate-200 hover:bg-slate-50">
-        {/* Nome */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
+        {/* Nome — max-w-0 obrigatório com table-fixed para truncar */}
+        <td className="max-w-0 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
             <button
               onClick={toggle}
               className="shrink-0 text-slate-400 transition hover:text-slate-600"
@@ -251,10 +251,10 @@ function DesktopRow({
                 : <ChevronDown className="h-4 w-4" />
               }
             </button>
-            <div>
-              <div className="font-medium text-slate-900">{customer.name}</div>
+            <div className="min-w-0 overflow-hidden">
+              <div className="truncate font-medium text-slate-900">{customer.name}</div>
               {customer.email && (
-                <div className="text-xs text-slate-500">{customer.email}</div>
+                <div className="truncate text-xs text-slate-500">{customer.email}</div>
               )}
             </div>
           </div>
@@ -262,12 +262,12 @@ function DesktopRow({
 
         {/* CPF */}
         <td className="hidden px-4 py-3 text-sm text-slate-600 md:table-cell">
-          <span className="font-mono">{maskCpfPrivacy(customer.cpf || "")}</span>
+          <span className="font-mono text-xs">{maskCpfPrivacy(customer.cpf || "")}</span>
         </td>
 
         {/* Telefone */}
         <td className="hidden px-4 py-3 text-sm text-slate-600 lg:table-cell">
-          <span className="font-mono">{maskPhonePrivacy(customer.phone || "")}</span>
+          <span className="font-mono text-xs">{maskPhonePrivacy(customer.phone || "")}</span>
         </td>
 
         {/* Saldo */}
@@ -436,28 +436,34 @@ export function CustomerTable({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
       {/* Desktop / tablet: tabela */}
       <div className="hidden overflow-x-auto sm:block">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead className="border-b border-slate-200 bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+              {/* Nome: ocupa o espaço restante */}
+              <th className="w-auto px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Nome
               </th>
-              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 md:table-cell">
+              {/* CPF: largura fixa, oculto em <md */}
+              <th className="hidden w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 md:table-cell">
                 CPF
               </th>
-              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell">
+              {/* Telefone: largura fixa, oculto em <lg */}
+              <th className="hidden w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell">
                 Telefone
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+              {/* Saldo: largura fixa */}
+              <th className="w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Saldo
               </th>
-              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell">
+              {/* Limite: largura fixa, oculto em <lg */}
+              <th className="hidden w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell">
                 Limite
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+              {/* Ações: largura mínima fixa */}
+              <th className="w-14 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Ações
               </th>
             </tr>

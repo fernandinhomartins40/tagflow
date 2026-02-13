@@ -188,7 +188,7 @@ export function AdminCustomers() {
   };
 
   return (
-    <section className="space-y-4">
+    <section className="w-full min-w-0 space-y-4 overflow-hidden">
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
